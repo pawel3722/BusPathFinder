@@ -124,6 +124,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BusPathFinder.cpp" />
+    <ClCompile Include="NetworkLoader.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="network.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Connection.h" />
+    <ClInclude Include="json.hpp" />
+    <ClInclude Include="Network.h" />
+    <ClInclude Include="NetworkLoader.h" />
+    <ClInclude Include="Route.h" />
+    <ClInclude Include="Service.h" />
+    <ClInclude Include="Stop.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,6 +1,9 @@
 ﻿#include <iostream>
+#include "NetworkLoader.h"
 
 int main()
 {
-    std::cout << "Hello World!\n";
+   auto network = NetworkLoader::load("network.json");
+
+    return 0;
 }
