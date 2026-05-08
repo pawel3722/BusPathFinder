@@ -2,13 +2,19 @@
 #include "Stop.h"
 #include <chrono>
 #include "Service.h"
-#include "StopTime.h"
+
+class StopTime;
+
 class Trip
 {
 	const Service* service;
-	const std::vector<StopTime*> stopTimes;
+	std::vector<StopTime*> stopTimes;
 public:
-	Trip(const Service* s, std::vector<StopTime*> st) : service(s), stopTimes(std::move(st)) {}
+	Trip(const Service* s) : service(s) {}
+	void addStopTime(StopTime* st)
+	{
+		stopTimes.push_back(st);
+	}
 	const Service* getService() const { return service; }
 	const std::vector<StopTime*>& getStopTimes() const { return stopTimes; }
 	const StopTime* getStopTime(int index) const

@@ -123,12 +123,12 @@ Path GeneticAlgorithm::findPath(const Network& network, const Stop* start, const
         population = std::move(newPop);
     }
 
-    auto best = *std::min_element(population.begin(), population.end(),
+    auto best = std::min_element(population.begin(), population.end(),
         [&](auto& a, auto& b)
         {
             return fitness(a, end) < fitness(b, end);
         });
-
+	Path path(*best);
 
     return path;
 }

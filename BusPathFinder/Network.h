@@ -39,6 +39,8 @@ public:
             auto conns = svc.second->getRoute()->getConnections();
             std::vector<StopTime*> localStopTimes;
 
+            auto trp = std::make_unique<Trip>(svc.second.get());
+
             for (int i = 0; i < conns.size(); i++)
             {
                 auto conn = conns[i];
@@ -46,21 +48,21 @@ public:
                 if (i == 0)
                 {
                     auto stop = conn->getFrom();
-                    auto ptr = std::make_unique<StopTime>(stop, time, i);
+                    auto ptr = std::make_unique<StopTime>(stop, trp.get(), time, i);
                     localStopTimes.push_back(ptr.get());
                     stopTimes[stop].push_back(std::move(ptr));
                 }
                 auto stop = conn->getTo();
                 time += std::chrono::minutes(conn->getTime());
-                auto ptr = std::make_unique<StopTime>(stop, time, i + 1);;
+                auto ptr = std::make_unique<StopTime>(stop, trp.get(), time, i + 1);;
                 localStopTimes.push_back(ptr.get());
                 stopTimes[stop].push_back(std::move(ptr));
                 
             }
-            auto trp = std::make_unique<Trip>(svc.second.get(), localStopTimes);
+            
             for (auto& st : localStopTimes)
             {
-                st->setTrip(trp.get(), svc.second->getRoute()->getName());
+                trp.get()->addStopTime(st);
             }
             trips.insert(std::move(trp));
         }

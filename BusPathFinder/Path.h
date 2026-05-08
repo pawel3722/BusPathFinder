@@ -8,16 +8,17 @@ struct PathNode
 	const Stop* startStop;
 	const Stop* endStop;
 	const Service* service;
-	const int departureTime;
-	const int arrivalTime;	
+	std::chrono::minutes departureTime;
+	std::chrono::minutes arrivalTime;
 };
 
 class Path
 {
 	std::vector<PathNode> nodes;
 public:
-	Path(std::vector<StopTime> v);
-	void addNode(const Stop* start, const Stop* end, const Service* service, int departureTime, int arrivalTime)
+	Path() {};
+	Path(std::vector<const StopTime*> v);
+	void addNode(Stop* start, Stop* end, Service* service, std::chrono::minutes departureTime, std::chrono::minutes arrivalTime)
 	{
 		nodes.push_back({start, end, service, departureTime, arrivalTime});
 	}

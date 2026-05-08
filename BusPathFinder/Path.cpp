@@ -1,6 +1,27 @@
 #include <iostream>
 #include "Path.h"
 
+#include <iomanip>
+#include <sstream>
+#include <chrono>
+
+std::string formatTime(std::chrono::minutes mins)
+{
+	int total = (int)mins.count();
+
+	int hours = total / 60;
+	int minutes = total % 60;
+
+	std::ostringstream oss;
+
+	oss << std::setw(2) << std::setfill('0') << hours
+		<< ":"
+		<< std::setw(2) << std::setfill('0') << minutes;
+
+	return oss.str();
+}
+
+
 std::ostream& operator<<(std::ostream& os, const Path& path)
 {
 	os << "================PATH================"<< std::endl;
@@ -9,17 +30,33 @@ std::ostream& operator<<(std::ostream& os, const Path& path)
 		os  << "Service: " << node.service->getRoute()->getName() << std::endl
 		    << "\tFrom: " << node.startStop->getName() 
 			<< " To: " << node.endStop->getName() << std::endl
-		    << "\tDeparture: " << node.departureTime 
-		    << " Arrival: " << node.arrivalTime << std::endl;
+		    << "\tDeparture: " << formatTime(std::chrono::minutes(node.departureTime))
+		    << " Arrival: " << formatTime(std::chrono::minutes(node.arrivalTime)) << std::endl;
 	}
 	return os;
 }
 
-Path::Path(std::vector<StopTime> v)
+Path::Path(std::vector<const StopTime*> v)
 {
 	Trip* currentTrip = nullptr;
+	auto nodeIndex = -1;
 	for (int i = 0; i < v.size() - 1; i++)
 	{
-		currentTrip = v[i].getTrip();
+		if (v[i]->getTrip() != currentTrip)
+		{
+			currentTrip = v[i]->getTrip();
+			nodes.push_back({ v[i]->getStop(), nullptr, v[i]->getTrip()->getService(), v[i]->getTime(), std::chrono::minutes(0)});
+			if (nodeIndex >= 0)
+			{
+				nodes[nodeIndex].endStop = v[i]->getStop();
+				nodes[nodeIndex].arrivalTime = v[i]->getTime();
+			}
+			nodeIndex++;
+		}
+	}
+	if (nodeIndex >= 0)
+	{
+		nodes[nodeIndex].endStop = v.back()->getStop();
+		nodes[nodeIndex].arrivalTime = v.back()->getTime();
 	}
 }

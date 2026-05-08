@@ -3,19 +3,57 @@
 #include "GeneticAlgorithm.h"
 #include "RouteFinder.h"
 
+#include <string>
+
+
 int main()
 {
-	auto network = NetworkLoader::load("network.json");
+    auto network = NetworkLoader::load("network.json");
 
-	GeneticAlgorithm genAlg;
+    GeneticAlgorithm genAlg;
+    RouteFinder genAlgRouteFinder(network, genAlg);
 
-	RouteFinder genAlgRouteFinder(network, genAlg);
-	const Stop* start = network.getStop(1); // Example stop ID
-	const Stop* end = network.getStop(18);   // Example stop ID
-	auto departureTime = NetworkLoader::parseTime("00:00");
+    int startId;
+    int endId;
+    std::string timeStr;
 
-	Path path = genAlgRouteFinder.findRoute(start, end, departureTime);
-	std::cout << path << std::endl;
+    while (true)
+    {
 
-	return 0;
+        std::cout << "Start stop ID: ";
+        std::cin >> startId;
+
+        std::cout << "End stop ID: ";
+        std::cin >> endId;
+
+        std::cout << "Departure time (HH:MM): ";
+        std::cin >> timeStr;
+
+        const Stop* start = network.getStop(startId);
+        const Stop* end = network.getStop(endId);
+
+        if (!start)
+        {
+            std::cout << "Invalid start stop ID\n";
+            return 1;
+        }
+
+        if (!end)
+        {
+            std::cout << "Invalid end stop ID\n";
+            return 1;
+        }
+
+        auto departureTime = NetworkLoader::parseTime(timeStr);
+
+        Path path = genAlgRouteFinder.findRoute(
+            start,
+            end,
+            departureTime
+        );
+
+        std::cout << path << std::endl;
+    }
+
+    return 0;
 }
