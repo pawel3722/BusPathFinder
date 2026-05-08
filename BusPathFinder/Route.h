@@ -13,4 +13,8 @@ public:
 	const int getId() const { return id; }
 	const std::string getName() const { return name; }
 	const std::vector<Connection*> getConnections() const { return connections; }
+	bool isLastStop(const Stop* stop) const
+	{
+		return connections.back()->getTo() == stop;
+	}
 };

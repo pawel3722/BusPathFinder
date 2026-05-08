@@ -29,26 +29,26 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -124,19 +124,28 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BusPathFinder.cpp" />
+    <ClCompile Include="GeneticAlgorithm.cpp" />
+    <ClCompile Include="Network.cpp" />
     <ClCompile Include="NetworkLoader.cpp" />
+    <ClCompile Include="Path.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="network.json" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Connection.h" />
+    <ClInclude Include="GeneticAlgorithm.h" />
+    <ClInclude Include="IAlgorithm.h" />
     <ClInclude Include="json.hpp" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="NetworkLoader.h" />
+    <ClInclude Include="Path.h" />
     <ClInclude Include="Route.h" />
+    <ClInclude Include="RouteFinder.h" />
     <ClInclude Include="Service.h" />
     <ClInclude Include="Stop.h" />
+    <ClInclude Include="StopTime.h" />
+    <ClInclude Include="Trip.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
