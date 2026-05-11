@@ -2,6 +2,7 @@
 
 #include <random>
 #include <algorithm>
+#include <iostream>
 
 #define POPULATION 30
 #define GENERATIONS 100
@@ -9,9 +10,31 @@
 
 static std::mt19937 rng(std::random_device{}());
 
+static int randomInt(int a, int b)
+{
+	if (a == b)
+		return a;
+    if (a > b)
+        std::swap(a, b);
+    std::uniform_int_distribution<int> dist(a, b);
+    return dist(rng);
+}
+
+static double randomDouble(double a, double b)
+{
+    std::uniform_real_distribution<double> dist(a, b);
+    return dist(rng);
+}
+
+inline StopTime* getRandomDeparture(std::vector<StopTime*> departureOptions)
+{
+    return departureOptions[randomInt(0, departureOptions.size() - 1)];
+}
+
 struct Individual
 {
     std::vector<ConnectionTime> genes;
+    bool isValid;
 
     // funkcje celu
     double travelTime = 0.0;
@@ -38,10 +61,19 @@ static bool dominates(const Individual& a, const Individual& b)
     return false;
 }
 
-static void evaluateIndividual(Individual& individual)
+static void evaluateIndividual(Individual& individual, const Stop* targetStop)
 {
-    if (individual.genes.empty())
+    individual.isValid =
+        !individual.genes.empty() &&
+        individual.genes.back().to->getStop() == targetStop;
+
+    if (!individual.isValid)
+    {
+        individual.travelTime = 1e9;
+        individual.cost = 1e9;
+        individual.transfers = 1e9;
         return;
+    }
 
     auto startTime = individual.genes.front().from->getTime();
     auto endTime = individual.genes.back().to->getTime();
@@ -308,29 +340,11 @@ void mutate(
     }
 }
 
-static int randomInt(int a, int b)
-{
-    std::uniform_int_distribution<int> dist(a, b);
-    return dist(rng);
-}
-
-static int randomDouble(double a, double b)
-{
-    std::uniform_int_distribution<int> dist(a, b);
-    return dist(rng);
-}
-
-inline StopTime* getRandomDeparture(std::vector<StopTime*> departureOptions)
-{
-    return departureOptions[randomInt(0, departureOptions.size() - 1)];
-}
-
-
 std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop* start, const Stop* end, std::chrono::minutes departureTime)
 {
-    auto departureOptions = network.getStopTimes(start, departureTime);
+    auto startOptions = network.getStopTimes(start, departureTime);
 
-    if (departureOptions.empty() || start == end)
+    if (startOptions.empty() || start == end)
         return { Path() };
 
     // populacja
@@ -341,7 +355,7 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         Individual individual;
         
         //wylosuj rozpoczecie podrozy
-        auto currentStopTime = getRandomDeparture(departureOptions);
+        auto currentStopTime = getRandomDeparture(startOptions);
         //weź następny przystanek z tej samej trasy
         auto nextStopTime = currentStopTime->getNextStopTime();
         individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
@@ -350,7 +364,7 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         while (individual.genes.back().to->getStop() != end)
         {
 			//wez opcje kontynuacji podrozy z tego przystanku
-            departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime());
+            auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime());
 			//jesli brak opcji, to przerwij
             if (departureOptions.empty())
                 break;
@@ -379,7 +393,7 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
     {
         // ocena
         for (auto& individual : population)
-            evaluateIndividual(individual);
+            evaluateIndividual(individual, end);
 
         // sortowanie Pareto
         auto fronts = nonDominatedSort(population);
@@ -400,7 +414,7 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
             if (randomDouble(0.0, 1.0) < 0.1)
                 mutate(child, network, end);
 
-            evaluateIndividual(child);
+            evaluateIndividual(child, end);
 
             offspring.push_back(child);
         }
@@ -461,4 +475,6 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
         results.push_back(path);
     }
+
+    return results;
 }

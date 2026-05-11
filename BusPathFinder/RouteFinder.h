@@ -8,7 +8,7 @@ class RouteFinder
 public:
 	RouteFinder(Network& net, IAlgorithm& alg) : network(net), algorithm(alg) {}
 
-	Path findRoute(const Stop* start, const Stop* end, std::chrono::minutes departureTime)
+	std::vector<Path> findRoute(const Stop* start, const Stop* end, std::chrono::minutes departureTime)
 	{
 		return algorithm.findPath(network, start, end, departureTime);
 	}

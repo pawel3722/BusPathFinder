@@ -13,9 +13,9 @@ int main()
     GeneticAlgorithm genAlg;
     RouteFinder genAlgRouteFinder(network, genAlg);
 
-    int startId;
-    int endId;
-    std::string timeStr;
+    int startId = 1;
+    int endId = 18;
+    std::string timeStr = "00:00";
 
     while (true)
     {
@@ -46,13 +46,16 @@ int main()
 
         auto departureTime = NetworkLoader::parseTime(timeStr);
 
-        Path path = genAlgRouteFinder.findRoute(
+        auto paths = genAlgRouteFinder.findRoute(
             start,
             end,
             departureTime
         );
 
-        std::cout << path << std::endl;
+        for (const auto& path : paths)
+        {
+            std::cout << path << std::endl;
+        }
     }
 
     return 0;
