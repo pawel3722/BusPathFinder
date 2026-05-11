@@ -36,27 +36,27 @@ std::ostream& operator<<(std::ostream& os, const Path& path)
 	return os;
 }
 
-Path::Path(std::vector<const StopTime*> v)
+Path::Path(std::vector<ConnectionTime> v)
 {
 	Trip* currentTrip = nullptr;
 	auto nodeIndex = -1;
 	for (int i = 0; i < v.size() - 1; i++)
 	{
-		if (v[i]->getTrip() != currentTrip)
+		if (v[i].to->getTrip() != currentTrip)
 		{
-			currentTrip = v[i]->getTrip();
-			nodes.push_back({ v[i]->getStop(), nullptr, v[i]->getTrip()->getService(), v[i]->getTime(), std::chrono::minutes(0)});
+			currentTrip = v[i].to->getTrip();
+			nodes.push_back({ v[i].from->getStop(), nullptr, v[i].from->getTrip()->getService(), v[i].from->getTime(), std::chrono::minutes(0)});
 			if (nodeIndex >= 0)
 			{
-				nodes[nodeIndex].endStop = v[i]->getStop();
-				nodes[nodeIndex].arrivalTime = v[i]->getTime();
+				nodes[nodeIndex].endStop = v[i].to->getStop();
+				nodes[nodeIndex].arrivalTime = v[i].to->getTime();
 			}
 			nodeIndex++;
 		}
 	}
 	if (nodeIndex >= 0)
 	{
-		nodes[nodeIndex].endStop = v.back()->getStop();
-		nodes[nodeIndex].arrivalTime = v.back()->getTime();
+		nodes[nodeIndex].endStop = v.back().to->getStop();
+		nodes[nodeIndex].arrivalTime = v.back().to->getTime();
 	}
 }

@@ -17,7 +17,7 @@ class Path
 	std::vector<PathNode> nodes;
 public:
 	Path() {};
-	Path(std::vector<const StopTime*> v);
+	Path(std::vector<ConnectionTime> v);
 	void addNode(Stop* start, Stop* end, Service* service, std::chrono::minutes departureTime, std::chrono::minutes arrivalTime)
 	{
 		nodes.push_back({start, end, service, departureTime, arrivalTime});

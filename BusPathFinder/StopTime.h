@@ -3,6 +3,12 @@
 #include "Trip.h"
 #include <chrono>
 
+struct ConnectionTime
+{
+	StopTime* from;
+	StopTime* to;
+};
+
 class StopTime
 {
 	const Stop* stop;
@@ -16,4 +22,5 @@ public:
 	const std::chrono::minutes getTime() const { return time; }
 	Trip* getTrip() const { return trip; }
 	const size_t getIndexInRoute() const { return indexInRoute; }
+	StopTime* getNextStopTime() const { return trip->getStopTime(indexInRoute + 1); }
 };

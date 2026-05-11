@@ -4,5 +4,5 @@
 class GeneticAlgorithm : public IAlgorithm
 {
 	public:
-		Path findPath(const Network& network, const Stop* start, const Stop* end, std::chrono::minutes departureTime) override;
+		std::vector<Path> findPath(const Network& network, const Stop* start, const Stop* end, std::chrono::minutes departureTime) override;
 };

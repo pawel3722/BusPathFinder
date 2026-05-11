@@ -17,7 +17,7 @@ public:
 	}
 	const Service* getService() const { return service; }
 	const std::vector<StopTime*>& getStopTimes() const { return stopTimes; }
-	const StopTime* getStopTime(int index) const
+	StopTime* getStopTime(int index) const
 	{
 		return stopTimes.at(index);
 	}
