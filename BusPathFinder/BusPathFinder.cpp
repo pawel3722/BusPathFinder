@@ -33,21 +33,21 @@ int main()
     GeneticAlgorithm genAlg;
     RouteFinder genAlgRouteFinder(network, genAlg);
 
-    int startId = 1;
-    int endId = 18;
-    std::string timeStr = "00:00";
+    int startId = 1461;
+    int endId = 114;
+    std::string timeStr = "17:00";
 
     while (true)
     {
 
-        std::cout << "Start stop ID: ";
+        /*std::cout << "Start stop ID: ";
         std::cin >> startId;
 
         std::cout << "End stop ID: ";
         std::cin >> endId;
 
         std::cout << "Departure time (HH:MM): ";
-        std::cin >> timeStr;
+        std::cin >> timeStr;*/
 
         if (startId == 0)
             startId = randomInt(1, 21);
@@ -88,6 +88,9 @@ int main()
         //{
         //    std::cout << path << std::endl;
         //}
+        std::cout << "koniec\n";
+        std::string x;
+        std::cin >> x;
     }
 
     return 0;
