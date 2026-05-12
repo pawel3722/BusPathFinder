@@ -2,8 +2,20 @@
 #include "NetworkLoader.h"
 #include "GeneticAlgorithm.h"
 #include "RouteFinder.h"
-
+#include <random>
 #include <string>
+
+static std::mt19937 rng(std::random_device{}());
+
+static int randomInt(int a, int b)
+{
+    if (a == b)
+        return a;
+    if (a > b)
+        std::swap(a, b);
+    std::uniform_int_distribution<int> dist(a, b);
+    return dist(rng);
+}
 
 
 int main()
@@ -29,6 +41,11 @@ int main()
         std::cout << "Departure time (HH:MM): ";
         std::cin >> timeStr;
 
+        if (startId == 0)
+            startId = randomInt(1, 21);
+        if (endId == 0)
+            endId = randomInt(1, 21);
+
         const Stop* start = network.getStop(startId);
         const Stop* end = network.getStop(endId);
 
@@ -44,7 +61,14 @@ int main()
             return 1;
         }
 
-        auto departureTime = NetworkLoader::parseTime(timeStr);
+        std::chrono::minutes departureTime;
+        try {
+            departureTime = NetworkLoader::parseTime(timeStr);
+        }
+        catch (std::exception ex)
+        {
+            departureTime = NetworkLoader::parseTime("00:00");
+        }
 
         auto paths = genAlgRouteFinder.findRoute(
             start,

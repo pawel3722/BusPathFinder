@@ -3,6 +3,7 @@
 #include <random>
 #include <algorithm>
 #include <iostream>
+#include <unordered_set>
 
 #define POPULATION 30
 #define GENERATIONS 100
@@ -37,6 +38,7 @@ struct Individual
     bool isValid;
 
     // funkcje celu
+    std::chrono::minutes arrivalTime;
     double travelTime = 0.0;
     double cost = 0.0;
     int transfers = 0;
@@ -47,15 +49,15 @@ struct Individual
 
     // pomocnicze
     int dominationCount = 0;
-    std::vector<int> dominated;
+    std::vector<int> dominated = {};
 };
 
 static bool dominates(const Individual& a, const Individual& b)
 {
-    if (a.travelTime > b.travelTime || a.cost > b.cost || a.transfers > b.transfers)
+    if (a.arrivalTime > b.arrivalTime || a.travelTime > b.travelTime || a.cost > b.cost || a.transfers > b.transfers)
         return false;
 
-    if (a.travelTime < b.travelTime || a.cost < b.cost || a.transfers < b.transfers)
+    if (a.arrivalTime < b.arrivalTime || a.travelTime < b.travelTime || a.cost < b.cost || a.transfers < b.transfers)
         return true;
 
     return false;
@@ -69,14 +71,17 @@ static void evaluateIndividual(Individual& individual, const Stop* targetStop)
 
     if (!individual.isValid)
     {
+        individual.arrivalTime = std::chrono::minutes::max() / 2;
         individual.travelTime = 1e9;
         individual.cost = 1e9;
         individual.transfers = 1e9;
         return;
-    }
+    }  
 
     auto startTime = individual.genes.front().from->getTime();
     auto endTime = individual.genes.back().to->getTime();
+
+    individual.arrivalTime = endTime;
 
     individual.travelTime =
         std::chrono::duration_cast<std::chrono::minutes>(
@@ -174,9 +179,34 @@ void computeCrowdingDistance(
     for (int idx : front)
         population[idx].crowdingDistance = 0.0;
 
-    // ===== CZAS =====
+    // ===== PRZYJAZD =====
     auto sorted = front;
 
+    std::sort(sorted.begin(), sorted.end(),
+        [&](int a, int b)
+        {
+            return population[a].arrivalTime < population[b].arrivalTime;
+        });
+
+    population[sorted.front()].crowdingDistance = INFINITY;
+    population[sorted.back()].crowdingDistance = INFINITY;
+
+    double minVal = population[sorted.front()].arrivalTime.count() * 1.0;
+    double maxVal = population[sorted.back()].arrivalTime.count() * 1.0;
+
+    if (maxVal > minVal)
+    {
+        for (int i = 1; i < sorted.size() - 1; i++)
+        {
+            population[sorted[i]].crowdingDistance +=
+                (population[sorted[i + 1]].arrivalTime.count() -
+                    population[sorted[i - 1]].arrivalTime.count()) * 1.0
+                / (maxVal - minVal);
+        }
+    }
+
+
+    // ===== CZAS =====
     std::sort(sorted.begin(), sorted.end(),
         [&](int a, int b)
         {
@@ -186,8 +216,8 @@ void computeCrowdingDistance(
     population[sorted.front()].crowdingDistance = INFINITY;
     population[sorted.back()].crowdingDistance = INFINITY;
 
-    double minVal = population[sorted.front()].travelTime;
-    double maxVal = population[sorted.back()].travelTime;
+    minVal = population[sorted.front()].travelTime;
+    maxVal = population[sorted.back()].travelTime;
 
     if (maxVal > minVal)
     {
@@ -278,13 +308,14 @@ Individual crossover(
     for (int i = 0; i < parent1.genes.size(); i++)
     {
         auto stop = parent1.genes[i].to->getStop();
+        auto time = parent1.genes[i].to->getTime();
 
         auto it = std::find_if(
             parent2.genes.begin(),
             parent2.genes.end(),
             [&](const auto& elem)
             {
-                return elem.to->getStop() == stop;
+                return elem.to->getStop() == stop && elem.to->getTime() >= time;
             });
 
         if (it != parent2.genes.end())
@@ -340,6 +371,31 @@ void mutate(
     }
 }
 
+static std::string pathSignature(const Individual& individual)
+{
+    std::string sig;
+
+    for (const auto& gene : individual.genes)
+    {
+        sig += std::to_string(
+            gene.from->getTrip()->getService()->getId());
+
+        sig += "|";
+
+        sig += std::to_string(
+            gene.from->getStop()->getId());
+
+        sig += "|";
+
+        sig += std::to_string(
+            gene.from->getTime().count());
+
+        sig += "->";
+    }
+
+    return sig;
+}
+
 std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop* start, const Stop* end, std::chrono::minutes departureTime)
 {
     auto startOptions = network.getStopTimes(start, departureTime);
@@ -353,33 +409,42 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
     for (int i = 0; i < POPULATION; i++)
     {
         Individual individual;
+
+        std::unordered_set<const Stop*> visited;
         
         //wylosuj rozpoczecie podrozy
         auto currentStopTime = getRandomDeparture(startOptions);
         //weź następny przystanek z tej samej trasy
         auto nextStopTime = currentStopTime->getNextStopTime();
         individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
-        
 
         while (individual.genes.back().to->getStop() != end)
         {
 			//wez opcje kontynuacji podrozy z tego przystanku
             auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime());
+
+            visited.insert(currentStopTime->getStop());
+
+            std::vector<StopTime*> filteredDepartureOptions;
+            for(auto& el: departureOptions)
+                if (visited.find(el->getNextStopTime()->getStop()) == visited.end())
+                    filteredDepartureOptions.push_back(el);
+            
 			//jesli brak opcji, to przerwij
-            if (departureOptions.empty())
+            if (filteredDepartureOptions.empty())
                 break;
 
 			//50% szans, że wybierzemy kontynuacje tej samej trasy
-            auto it = std::find_if(departureOptions.begin(), departureOptions.end(),
+            auto it = std::find_if(filteredDepartureOptions.begin(), filteredDepartureOptions.end(),
                 [&](const auto& elem)
                 {
                     return elem->getTrip() == currentStopTime->getTrip();
                 });
 
-            if (it != departureOptions.end() && randomInt(0, 100) < 50)
+            if (it != filteredDepartureOptions.end() && randomInt(0, 100) < 85)
                 currentStopTime = *it;
             else
-			    currentStopTime = getRandomDeparture(departureOptions);
+			    currentStopTime = getRandomDeparture(filteredDepartureOptions);
 
             //weź następny przystanek z tej samej trasy
             nextStopTime = currentStopTime->getNextStopTime();
@@ -404,6 +469,8 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         // potomstwo
         std::vector<Individual> offspring;
 
+        std::unordered_set<std::string> offspringSignatures;
+
         while (offspring.size() < population.size())
         {
             auto parent1 = tournamentSelection(population);
@@ -415,6 +482,13 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
                 mutate(child, network, end);
 
             evaluateIndividual(child, end);
+
+            auto sig = pathSignature(child);
+
+            if (offspringSignatures.find(sig) != offspringSignatures.end())
+                continue;
+
+            offspringSignatures.insert(sig);
 
             offspring.push_back(child);
         }
@@ -432,6 +506,8 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
         population.clear();
 
+        std::unordered_set<std::string> populationSignatures;
+
         for (const auto& front : combinedFronts)
         {
             computeCrowdingDistance(combined, front);
@@ -439,7 +515,15 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
             if (population.size() + front.size() <= POPULATION)
             {
                 for (int idx : front)
+                {
+                    auto sig = pathSignature(combined[idx]);
+
+                    if (populationSignatures.find(sig) != populationSignatures.end())
+                        continue;
+
+                    populationSignatures.insert(sig);
                     population.push_back(combined[idx]);
+                }
             }
             else
             {
@@ -457,6 +541,12 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
                     if (population.size() >= POPULATION)
                         break;
 
+                    auto sig = pathSignature(combined[idx]);
+
+                    if (populationSignatures.find(sig) != populationSignatures.end())
+                        continue;
+
+                    populationSignatures.insert(sig);
                     population.push_back(combined[idx]);
                 }
 

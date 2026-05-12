@@ -40,7 +40,7 @@ Path::Path(std::vector<ConnectionTime> v)
 {
 	Trip* currentTrip = nullptr;
 	auto nodeIndex = -1;
-	for (int i = 0; i < v.size() - 1; i++)
+	for (int i = 0; i < v.size(); i++)
 	{
 		if (v[i].to->getTrip() != currentTrip)
 		{
@@ -48,8 +48,8 @@ Path::Path(std::vector<ConnectionTime> v)
 			nodes.push_back({ v[i].from->getStop(), nullptr, v[i].from->getTrip()->getService(), v[i].from->getTime(), std::chrono::minutes(0)});
 			if (nodeIndex >= 0)
 			{
-				nodes[nodeIndex].endStop = v[i].to->getStop();
-				nodes[nodeIndex].arrivalTime = v[i].to->getTime();
+				nodes[nodeIndex].endStop = v[i-1].to->getStop();
+				nodes[nodeIndex].arrivalTime = v[i-1].to->getTime();
 			}
 			nodeIndex++;
 		}

@@ -19,6 +19,6 @@ public:
 	const std::vector<StopTime*>& getStopTimes() const { return stopTimes; }
 	StopTime* getStopTime(int index) const
 	{
-		return stopTimes.at(index);
+		return index < stopTimes.size() ? stopTimes.at(index) : nullptr;
 	}
 };
