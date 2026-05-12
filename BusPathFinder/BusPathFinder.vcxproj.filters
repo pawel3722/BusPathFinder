@@ -35,6 +35,15 @@
     <None Include="network.json">
       <Filter>Pliki zasobów</Filter>
     </None>
+    <None Include="..\..\..\..\Desktop\Magisterka\Workspace\Gdansk\gd_stop_times.json">
+      <Filter>Pliki zasobów</Filter>
+    </None>
+    <None Include="..\..\..\..\Desktop\Magisterka\Workspace\Gdansk\gd_stops.json">
+      <Filter>Pliki zasobów</Filter>
+    </None>
+    <None Include="..\..\..\..\Desktop\Magisterka\Workspace\Gdansk\gd_trips.json">
+      <Filter>Pliki zasobów</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Stop.h">

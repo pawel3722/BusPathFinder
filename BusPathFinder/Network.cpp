@@ -3,17 +3,17 @@
 std::vector<StopTime*> Network::getStopTimes(const Stop* stop, std::chrono::minutes minTime) const
 {
     std::vector<StopTime*> result;
-    std::set<int> routeIds;
-    for (const auto& el : stopTimes.at(stop))
+    std::set<std::string> routeIds;
+    for (const auto& route : stopTimesIndex.at(stop))
     {
-        auto route = el->getTrip()->getService()->getRoute();
-        if (el->getTime() >= minTime 
-            && routeIds.find(route->getId()) == routeIds.end() 
-            && !route->isLastStop(stop))
-        {
-            result.push_back(el.get());
-            routeIds.insert(route->getId());
-        }
+        if(route.second.size() > 0 && route.second[0]->getNextStopTime() == nullptr)
+            continue;
+        for (const auto& dep : route.second)
+            if (dep->getTime() >= minTime && dep->getNextStopTime() != nullptr)
+            {
+                result.push_back(dep);
+                break;
+            }
     }
     return result;
 }

@@ -130,6 +130,9 @@
     <ClCompile Include="Path.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\..\Desktop\Magisterka\Workspace\Gdansk\gd_stops.json" />
+    <None Include="..\..\..\..\Desktop\Magisterka\Workspace\Gdansk\gd_stop_times.json" />
+    <None Include="..\..\..\..\Desktop\Magisterka\Workspace\Gdansk\gd_trips.json" />
     <None Include="network.json" />
   </ItemGroup>
   <ItemGroup>

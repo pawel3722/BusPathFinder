@@ -1,4 +1,5 @@
 ﻿#include <iostream>
+#include <windows.h>
 #include "NetworkLoader.h"
 #include "GeneticAlgorithm.h"
 #include "RouteFinder.h"
@@ -20,7 +21,14 @@ static int randomInt(int a, int b)
 
 int main()
 {
-    auto network = NetworkLoader::load("network.json");
+    #ifdef _WIN32
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+    #endif
+
+
+
+    auto network = NetworkLoader::load("gd_stops.json","gd_trips.json","gd_stop_times.json");
 
     GeneticAlgorithm genAlg;
     RouteFinder genAlgRouteFinder(network, genAlg);
@@ -76,10 +84,10 @@ int main()
             departureTime
         );
 
-        for (const auto& path : paths)
-        {
-            std::cout << path << std::endl;
-        }
+        //for (const auto& path : paths)
+        //{
+        //    std::cout << path << std::endl;
+        //}
     }
 
     return 0;

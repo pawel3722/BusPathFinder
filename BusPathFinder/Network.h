@@ -13,68 +13,39 @@
 class Network {
     // immutable maps
     std::unordered_map<int, std::unique_ptr<Stop>> stops;
-    std::unordered_map<int, std::unique_ptr<Connection>> connections;
-    std::unordered_map<int, std::unique_ptr<Route>> routes;
-    std::unordered_map<int, std::unique_ptr<Service>> services;
+    std::unordered_set<std::unique_ptr<StopTime>> stopTimes;
+    std::unordered_map<std::string,std::unique_ptr<Trip>> trips;
 
-
-    std::unordered_map<const Stop*,std::vector<std::unique_ptr<StopTime>> > stopTimes;
-    std::set<std::unique_ptr<Trip>> trips;
+    std::unordered_map<const Stop*, std::unordered_map<std::string, std::vector<StopTime*>>> stopTimesIndex;
 
 public:
     Network(
         std::unordered_map<int, std::unique_ptr<Stop>> s,
-        std::unordered_map<int, std::unique_ptr<Connection>> c,
-        std::unordered_map<int, std::unique_ptr<Route>> r,
-        std::unordered_map<int, std::unique_ptr<Service>> svc
+        std::unordered_set<std::unique_ptr<StopTime>> st,
+        std::unordered_map<std::string, std::unique_ptr<Trip>> t
     )
         : stops(std::move(s)),
-        connections(std::move(c)),
-        routes(std::move(r)),
-        services(std::move(svc))
+       stopTimes(std::move(st)),
+       trips(std::move(t))
     {
-        for (const auto& svc : services)
+        for (const auto& el : stopTimes)
         {
-            auto time = svc.second->getStartTime();
-            auto conns = svc.second->getRoute()->getConnections();
-            std::vector<StopTime*> localStopTimes;
-
-            auto trp = std::make_unique<Trip>(svc.second.get());
-
-            for (int i = 0; i < conns.size(); i++)
-            {
-                auto conn = conns[i];
-
-                if (i == 0)
-                {
-                    auto stop = conn->getFrom();
-                    auto ptr = std::make_unique<StopTime>(stop, trp.get(), time, i);
-                    localStopTimes.push_back(ptr.get());
-                    stopTimes[stop].push_back(std::move(ptr));
-                }
-                auto stop = conn->getTo();
-                time += std::chrono::minutes(conn->getTime());
-                auto ptr = std::make_unique<StopTime>(stop, trp.get(), time, i + 1);;
-                localStopTimes.push_back(ptr.get());
-                stopTimes[stop].push_back(std::move(ptr));
-                
-            }
-            
-            for (auto& st : localStopTimes)
-            {
-                trp.get()->addStopTime(st);
-            }
-            trips.insert(std::move(trp));
+            auto ptr = el.get();
+            stopTimesIndex[ptr->getStop()][ptr->getTrip()->getRouteId()].push_back(ptr);
         }
 
-        for (auto& el : stopTimes)
+
+        for (auto& el : stopTimesIndex)
         {
-            std::sort(el.second.begin(), el.second.end(),
-                [](const std::unique_ptr<StopTime>& a,
-                    const std::unique_ptr<StopTime>& b)
-                {
-                    return a->getTime() < b->getTime();
-                });
+            for (auto& pos : el.second)
+            {
+                std::sort(pos.second.begin(), pos.second.end(),
+                    [](const StopTime* a,
+                        const StopTime* b)
+                    {
+                        return a->getTime() < b->getTime();
+                    });
+            }
         }
     }
 
@@ -83,22 +54,5 @@ public:
         return it != stops.end() ? it->second.get() : nullptr;
     }
 
-    const Connection* getConnection(int id) const {
-        auto it = connections.find(id);
-        return it != connections.end() ? it->second.get() : nullptr;
-    }
-
-    const Route* getRoute(int id) const {
-        auto it = routes.find(id);
-        return it != routes.end() ? it->second.get() : nullptr;
-    }
-
-    const Service* getService(int id) const {
-        auto it = services.find(id);
-        return it != services.end() ? it->second.get() : nullptr;
-    }
-
-    std::vector<StopTime*> getStopTimes(const Stop* stop, std::chrono::minutes minTime) const;
-
-    
+    std::vector<StopTime*> getStopTimes(const Stop* stop, std::chrono::minutes minTime) const;    
 };

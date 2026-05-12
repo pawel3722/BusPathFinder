@@ -12,7 +12,6 @@ struct ConnectionTime
 class StopTime
 {
 	const Stop* stop;
-	std::string direction = "";
 	const std::chrono::minutes time;
 	Trip* trip;
 	size_t indexInRoute;

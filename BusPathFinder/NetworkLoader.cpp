@@ -1,86 +1,154 @@
 #include "NetworkLoader.h"
+
 #include <fstream>
 #include "json.hpp"
 
 using json = nlohmann::json;
 
-Network NetworkLoader::load(const std::string& filename)
+Network NetworkLoader::load(
+    const std::string& stopsFile,
+    const std::string& tripsFile,
+    const std::string& stopTimesFile)
 {
     std::unordered_map<int, std::unique_ptr<Stop>> stops;
-    std::unordered_map<int, std::unique_ptr<Connection>> connections;
-    std::unordered_map<int, std::unique_ptr<Route>> routes;
-    std::unordered_map<int, std::unique_ptr<Service>> services;
+    std::unordered_set<std::unique_ptr<StopTime>> stopTimes;
+    std::unordered_map<std::string, std::unique_ptr<Trip>> trips;
 
-    std::ifstream file(filename);
-    if (!file)
-        throw std::runtime_error("Cannot open file");
+    std::map<int, Stop*> platformsAssignments;
 
-    json j;
-    file >> j;
+    // =========================
+    // STOPS
+    // =========================
 
-    // --- STOPS ---
-    for (const auto& stopJson : j["stops"])
     {
-        int id = stopJson["id"];
-        int zone = stopJson["zone"];
-        std::string name = stopJson["name"];
+        std::ifstream file(stopsFile);
 
-        stops[id] = std::make_unique<Stop>(id, zone, std::move(name));
-    }
+        if (!file)
+            throw std::runtime_error("Cannot open stops file");
 
-    // --- CONNECTIONS ---
-    for (const auto& connectionJson : j["connections"])
-    {
-        int id = connectionJson["id"];
-        int time = connectionJson["time"];
-        Stop* from = stops[connectionJson["from"]].get();
-        Stop* to = stops[connectionJson["to"]].get();
+        json j;
+        file >> j;
 
-        connections[id] = std::make_unique<Connection>(id, time, from, to);
-    }
-
-    // --- ROUTES ---
-    for (const auto& routeJson : j["routes"])
-    {
-        int id = routeJson["id"];
-        std::string name = routeJson["name"];
-        std::vector<Connection*> routeConnections;
-        std::vector<int> connectionIds = routeJson["connections"].get<std::vector<int>>();
-        for (const auto& el : connectionIds)
+        for (const auto& stopJson : j)
         {
-            routeConnections.push_back(connections[el].get());
+            int id = stopJson["id"];
+            int zone = stopJson.value("zone", 0);
+
+            std::string name = stopJson["name"];
+            double lat = stopJson["lat"];
+            double lon = stopJson["lon"];
+
+            std::vector<int> platformsIds =
+                stopJson["platforms"].get<std::vector<int>>();
+
+            stops[id] = std::make_unique<Stop>(
+                id,
+                zone,
+                std::move(name),
+                lat,
+                lon
+            );
+
+            for (const auto& el : platformsIds)
+                platformsAssignments[el] = stops[id].get();
         }
-        
-        routes[id] = std::make_unique<Route>(id, std::move(name), std::move(routeConnections));
     }
 
-    // --- SERVICES ---
-    for (const auto& serviceJson : j["services"])
+    // =========================
+    // TRIPS
+    // =========================
+
     {
-        int id = serviceJson["id"];
-        std::chrono::minutes time = parseTime(serviceJson["startTime"]);
-        Route* route = routes[serviceJson["route"]].get();
-        services[id] = std::make_unique<Service>(id, time, route);
+        std::ifstream file(tripsFile);
+
+        if (!file)
+            throw std::runtime_error("Cannot open trips file");
+
+        json j;
+        file >> j;
+
+        for (const auto& tripJson : j["trips"])
+        {
+            std::string id = tripJson["id"];
+            std::string line = tripJson["line"];
+            std::string direction = tripJson["direction"];
+            std::string routeId = tripJson["shape_id"];
+
+            trips[id] = std::make_unique<Trip>(
+                id,
+                line,
+                direction,
+                routeId
+            );
+        }
+    }
+
+    // =========================
+    // STOP TIMES
+    // =========================
+
+    {
+        std::ifstream file(stopTimesFile);
+
+        if (!file)
+            throw std::runtime_error("Cannot open stop_times file");
+
+        json j;
+        file >> j;
+
+        for (const auto& stopTimeJson : j["stopTimes"])
+        {
+            std::string tripId = stopTimeJson["trip_id"];
+
+            Trip* trip = trips.at(tripId).get();
+
+            std::chrono::minutes time =
+                parseTime(stopTimeJson["time"]);
+
+            int stopId = stopTimeJson["stop_id"];
+
+            Stop* stop = platformsAssignments.at(stopId);
+
+            int index = stopTimeJson["index"];
+
+            auto ptr = std::make_unique<StopTime>(
+                stop,
+                trip,
+                time,
+                index
+            );
+
+            trip->addStopTime(
+                ptr.get()
+            );
+
+            auto res = stopTimes.insert(std::move(ptr));
+        }
     }
 
     return Network(
         std::move(stops),
-        std::move(connections),
-        std::move(routes),
-        std::move(services)
+        std::move(stopTimes),
+        std::move(trips)
     );
 }
 
 std::chrono::minutes NetworkLoader::parseTime(const std::string& str)
 {
-    if (str.size() != 5 || str[2] != ':')
+    // obsługa HH:MM lub HH:MM:SS
+
+    if (str.size() != 5 && str.size() != 8)
         throw std::invalid_argument("Invalid time format");
 
     int hour = std::stoi(str.substr(0, 2));
     int minute = std::stoi(str.substr(3, 2));
 
-    if (hour < 0 || hour > 23 || minute < 0 || minute > 59)
+    // GTFS pozwala na godziny > 23
+    // np. 26:30:00
+
+    if (hour < 0 || minute < 0 || minute > 59)
         throw std::out_of_range("Time out of range");
 
-    return std::chrono::hours(hour) + std::chrono::minutes(minute);
+    return std::chrono::hours(hour)
+        + std::chrono::minutes(minute);
 }
