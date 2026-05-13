@@ -20,30 +20,12 @@ int main()
     GeneticAlgorithm genAlg;
     RouteFinder genAlgRouteFinder(network, genAlg);
 
-<<<<<<< HEAD
-    int startId = 1461;
-    int endId = 114;
-    std::string timeStr = "17:00";
-=======
     int startId = 0;
     int endId = 0;
     std::string timeStr = "00:00";
->>>>>>> history
-
     while (true)
     {
 
-<<<<<<< HEAD
-        /*std::cout << "Start stop ID: ";
-        std::cin >> startId;
-
-        std::cout << "End stop ID: ";
-        std::cin >> endId;
-
-        std::cout << "Departure time (HH:MM): ";
-        std::cin >> timeStr;*/
-
-=======
         const Stop* start = nullptr;
         const Stop* end = nullptr;
         std::chrono::minutes departureTime;
@@ -51,7 +33,6 @@ int main()
         std::cout << "Start stop ID: ";
         std::cin >> startId;
 
->>>>>>> history
         if (startId == 0)
         {
             start = network.getRandomStop();
@@ -99,20 +80,10 @@ int main()
             departureTime
         );
 
-<<<<<<< HEAD
-        //for (const auto& path : paths)
-        //{
-        //    std::cout << path << std::endl;
-        //}
-        std::cout << "koniec\n";
-        std::string x;
-        std::cin >> x;
-=======
         for (const auto& path : paths)
         {
             std::cout << path << std::endl;
         }
->>>>>>> history
     }
 
     return 0;

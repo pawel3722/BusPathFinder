@@ -124,7 +124,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BusPathFinder.cpp" />
-    <ClCompile Include="FileName.cpp" />
     <ClCompile Include="Functions.cpp" />
     <ClCompile Include="GeneticAlgorithm.cpp" />
     <ClCompile Include="Network.cpp" />
