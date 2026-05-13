@@ -1,25 +1,8 @@
 #include <iostream>
-#include "Path.h"
-
-#include <iomanip>
-#include <sstream>
 #include <chrono>
 
-std::string formatTime(std::chrono::minutes mins)
-{
-	int total = (int)mins.count();
-
-	int hours = total / 60;
-	int minutes = total % 60;
-
-	std::ostringstream oss;
-
-	oss << std::setw(2) << std::setfill('0') << hours
-		<< ":"
-		<< std::setw(2) << std::setfill('0') << minutes;
-
-	return oss.str();
-}
+#include "Path.h"
+#include "Functions.h"
 
 
 std::ostream& operator<<(std::ostream& os, const Path& path)

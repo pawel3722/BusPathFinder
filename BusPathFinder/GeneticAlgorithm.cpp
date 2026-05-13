@@ -1,13 +1,13 @@
-#include "GeneticAlgorithm.h"
-
 #include <random>
 #include <algorithm>
 #include <iostream>
-#include <unordered_set>
 
-#define M_PI 3.14159265
-#define POPULATION 30
-#define GENERATIONS 100
+#include "GeneticAlgorithm.h"
+#include "Functions.h"
+
+
+#define POPULATION 100
+#define GENERATIONS 150
 #define MAX_PATH_LENGTH 50
 
 struct Individual
@@ -31,46 +31,6 @@ struct Individual
     std::vector<int> dominated = {};
 };
 
-static std::mt19937 rng(std::random_device{}());
-
-static int randomInt(int a, int b)
-{
-	if (a == b)
-		return a;
-    if (a > b)
-        std::swap(a, b);
-    std::uniform_int_distribution<int> dist(a, b);
-    return dist(rng);
-}
-
-static double randomDouble(double a, double b)
-{
-    std::uniform_real_distribution<double> dist(a, b);
-    return dist(rng);
-}
-
-static double haversine(double lat1, double lon1,
-    double lat2, double lon2)
-{
-    // distance between latitudes
-    // and longitudes
-    double dLat = (lat2 - lat1) *
-        M_PI / 180.0;
-    double dLon = (lon2 - lon1) *
-        M_PI / 180.0;
-
-    // convert to radians
-    lat1 = (lat1)*M_PI / 180.0;
-    lat2 = (lat2)*M_PI / 180.0;
-
-    // apply formulae
-    double a = pow(sin(dLat / 2), 2) +
-        pow(sin(dLon / 2), 2) *
-        cos(lat1) * cos(lat2);
-    double rad = 6371;
-    double c = 2 * asin(sqrt(a));
-    return rad * c;
-}
 
 double geoDistance(const Stop* a, const Stop* b)
 {
@@ -103,7 +63,7 @@ static StopTime* chooseNextDeparture(
     // cumulative distribution
     for (auto& w : weights)
         w /= weightSum;
-
+    
     for (int i = 1; i < weights.size(); i++)
         weights[i] += weights[i - 1];
 
@@ -149,7 +109,7 @@ static void evaluateIndividual(Individual& individual, std::chrono::minutes depa
     if (!individual.isValid)
     {
         individual.arrivalTime = std::chrono::minutes::max() / 2;
-        //individual.travelTime = std::chrono::minutes::max() / 2;
+        individual.travelTime = std::chrono::minutes::max() / 2;
         individual.waitingTime = std::chrono::minutes::max() / 2;
         individual.cost = 1e9;
         individual.transfers = 1e9;
@@ -161,7 +121,7 @@ static void evaluateIndividual(Individual& individual, std::chrono::minutes depa
 
     individual.arrivalTime = endTime;
 
-    //individual.travelTime = std::chrono::duration_cast<std::chrono::minutes>(endTime - startTime);
+    individual.travelTime = std::chrono::duration_cast<std::chrono::minutes>(endTime - startTime);
     individual.waitingTime = std::chrono::minutes(0);
 
     individual.cost = 0.0;
@@ -289,29 +249,29 @@ void computeCrowdingDistance(
     }
 
 
-    //// ===== CZAS JAZDY =====
-    //std::sort(sorted.begin(), sorted.end(),
-    //    [&](int a, int b)
-    //    {
-    //        return population[a].travelTime < population[b].travelTime;
-    //    });
+    // ===== CZAS JAZDY =====
+    std::sort(sorted.begin(), sorted.end(),
+        [&](int a, int b)
+        {
+            return population[a].travelTime < population[b].travelTime;
+        });
 
-    //population[sorted.front()].crowdingDistance = INFINITY;
-    //population[sorted.back()].crowdingDistance = INFINITY;
+    population[sorted.front()].crowdingDistance = INFINITY;
+    population[sorted.back()].crowdingDistance = INFINITY;
 
-    //minVal = population[sorted.front()].travelTime.count() * 1.0;
-    //maxVal = population[sorted.back()].travelTime.count() * 1.0;
+    minVal = population[sorted.front()].travelTime.count() * 1.0;
+    maxVal = population[sorted.back()].travelTime.count() * 1.0;
 
-    //if (maxVal > minVal)
-    //{
-    //    for (int i = 1; i < sorted.size() - 1; i++)
-    //    {
-    //        population[sorted[i]].crowdingDistance +=
-    //           ( population[sorted[i + 1]].travelTime.count() 
-    //           - population[sorted[i - 1]].travelTime.count()) * 1.0
-    //           / (maxVal - minVal);
-    //    }
-    //}
+    if (maxVal > minVal)
+    {
+        for (int i = 1; i < sorted.size() - 1; i++)
+        {
+            population[sorted[i]].crowdingDistance +=
+               ( population[sorted[i + 1]].travelTime.count() 
+               - population[sorted[i - 1]].travelTime.count()) * 1.0
+               / (maxVal - minVal);
+        }
+    }
 
     // ===== CZAS OCZEKIWANIA =====
     std::sort(sorted.begin(), sorted.end(),
@@ -396,21 +356,31 @@ Individual tournamentSelection(
     const auto& p1 = population[a];
     const auto& p2 = population[b];
 
-    // 1. rank (Pareto)
+    // rank
     if (p1.rank < p2.rank)
-        return p1;
+    {
+        if (randomDouble(0.0, 1.0) < 0.8)
+            return p1;
+
+        return p2;
+    }
 
     if (p2.rank < p1.rank)
-        return p2;
+    {
+        if (randomDouble(0.0, 1.0) < 0.8)
+            return p2;
 
-    // 2. crowding distance
+        return p1;
+    }
+
+    // crowding
     if (p1.crowdingDistance > p2.crowdingDistance)
         return p1;
 
     if (p2.crowdingDistance > p1.crowdingDistance)
         return p2;
 
-    // 3. HEURYSTYKA GPS
+    // GPS heuristic
     double h1 = heuristicToGoal(p1, end);
     double h2 = heuristicToGoal(p2, end);
 
@@ -422,40 +392,112 @@ Individual tournamentSelection(
 
 Individual crossover(
     const Individual& parent1,
-    const Individual& parent2)
+    const Individual& parent2,
+    const Stop* end)
 {
     Individual child;
 
+    struct Candidate
+    {
+        int i;
+        int j;
+        double weight;
+    };
+
+    std::vector<Candidate> candidates;
+
     for (int i = 0; i < parent1.genes.size(); i++)
     {
-        auto stop = parent1.genes[i].to->getStop();
-        auto time = parent1.genes[i].to->getTime();
+        auto* stop1 = parent1.genes[i].to->getStop();
+        auto time1 = parent1.genes[i].to->getTime();
 
-        auto it = std::find_if(
-            parent2.genes.begin(),
-            parent2.genes.end(),
-            [&](const auto& elem)
-            {
-                return elem.to->getStop() == stop && elem.to->getTime() >= time;
-            });
-
-        if (it != parent2.genes.end())
+        for (int j = 0; j < parent2.genes.size(); j++)
         {
-            child.genes.insert(
-                child.genes.end(),
-                parent1.genes.begin(),
-                parent1.genes.begin() + i + 1);
+            auto* stop2 = parent2.genes[j].to->getStop();
+            auto time2 = parent2.genes[j].to->getTime();
 
-            child.genes.insert(
-                child.genes.end(),
-                it + 1,
-                parent2.genes.end());
+            if (stop1 != stop2 || time2 < time1)
+                continue;
 
-            return child;
+            auto diff = abs((time2 - time1).count());
+
+            if (diff > 30)
+                continue;
+
+            double dist = geoDistance(stop1, end);
+
+            candidates.push_back({
+                i,
+                j,
+                1.0 / (dist + 1.0)
+                });
         }
     }
 
-    return parent1;
+    if (candidates.empty())
+        return randomInt(0, 1) ? parent1 : parent2;
+
+    double sum = 0.0;
+
+    for (const auto& c : candidates)
+        sum += c.weight;
+
+    double r = randomDouble(0.0, sum);
+
+    Candidate selected = candidates.front();
+
+    double acc = 0.0;
+
+    for (const auto& c : candidates)
+    {
+        acc += c.weight;
+
+        if (r <= acc)
+        {
+            selected = c;
+            break;
+        }
+    }
+
+    child.genes.insert(
+        child.genes.end(),
+        parent1.genes.begin(),
+        parent1.genes.begin() + selected.i + 1);
+
+    child.genes.insert(
+        child.genes.end(),
+        parent2.genes.begin() + selected.j + 1,
+        parent2.genes.end());
+
+    // cycle repair
+    std::unordered_map<const Stop*, int> visited;
+    std::vector<ConnectionTime> repaired;
+
+    for (const auto& gene : child.genes)
+    {
+        auto* stop = gene.to->getStop();
+
+        auto it = visited.find(stop);
+
+        if (it != visited.end())
+        {
+            repaired.resize(it->second + 1);
+
+            visited.clear();
+
+            for (int i = 0; i < repaired.size(); i++)
+                visited[repaired[i].to->getStop()] = i;
+
+            continue;
+        }
+
+        visited[stop] = repaired.size();
+        repaired.push_back(gene);
+    }
+
+    child.genes = repaired;
+
+    return child;
 }
 
 void mutate(
@@ -600,7 +642,7 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
             auto parent1 = tournamentSelection(population, end);
             auto parent2 = tournamentSelection(population, end);
 
-            auto child = crossover(parent1, parent2);
+            auto child = crossover(parent1, parent2, end);
 
             if (randomDouble(0.0, 1.0) < 0.1)
                 mutate(child, network, end);
@@ -693,14 +735,17 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         results.push_back(path);
     }
 
-    std::sort(results.begin(), results.end(), [](const Path& p1, const Path& p2) {return p1.getTransfers() < p2.getTransfers();});
+    std::sort(results.begin(), results.end(), [](const Path& p1, const Path& p2) {
+        if(p1.getArrivalTime() == p2.getArrivalTime())
+            return p1.getTransfers() < p2.getTransfers();
+        return p1.getArrivalTime() < p2.getArrivalTime();
+    });
 
-    for (const auto& path : results)
+
+    /*for (const auto& path : results)
     {
         std::cout << path << std::endl;
-    }
-
-
+    }*/
 
     return results;
 }

@@ -124,6 +124,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BusPathFinder.cpp" />
+    <ClCompile Include="FileName.cpp" />
+    <ClCompile Include="Functions.cpp" />
     <ClCompile Include="GeneticAlgorithm.cpp" />
     <ClCompile Include="Network.cpp" />
     <ClCompile Include="NetworkLoader.cpp" />
@@ -136,16 +138,14 @@
     <None Include="network.json" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Connection.h" />
+    <ClInclude Include="Functions.h" />
     <ClInclude Include="GeneticAlgorithm.h" />
     <ClInclude Include="IAlgorithm.h" />
     <ClInclude Include="json.hpp" />
     <ClInclude Include="Network.h" />
     <ClInclude Include="NetworkLoader.h" />
     <ClInclude Include="Path.h" />
-    <ClInclude Include="Route.h" />
     <ClInclude Include="RouteFinder.h" />
-    <ClInclude Include="Service.h" />
     <ClInclude Include="Stop.h" />
     <ClInclude Include="StopTime.h" />
     <ClInclude Include="Trip.h" />

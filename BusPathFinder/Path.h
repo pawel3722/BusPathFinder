@@ -1,6 +1,5 @@
 #pragma once
 #include "Stop.h"
-#include "Service.h"
 #include "StopTime.h"
 
 struct PathNode
@@ -27,7 +26,10 @@ public:
 	{
 		nodes.push_back({start, end, service, departureTime, arrivalTime});
 	}
+
 	int getTransfers() const { return transfers; }
+	std::chrono::minutes getArrivalTime() const { return arrivalTime; }
+
 	const std::vector<PathNode>& getNodes() const { return nodes; }
 	friend std::ostream& operator<<(std::ostream& os, const Path& path);
 };
