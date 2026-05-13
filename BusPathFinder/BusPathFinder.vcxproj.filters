@@ -30,9 +30,6 @@
     <ClCompile Include="Network.cpp">
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
-    <ClCompile Include="FileName.cpp">
-      <Filter>Pliki źródłowe</Filter>
-    </ClCompile>
     <ClCompile Include="Functions.cpp">
       <Filter>Pliki źródłowe</Filter>
     </ClCompile>
