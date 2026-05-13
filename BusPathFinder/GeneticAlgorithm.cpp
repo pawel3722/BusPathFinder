@@ -9,12 +9,11 @@
 #define POPULATION 100
 #define GENERATIONS 150
 #define MAX_PATH_LENGTH 50
-#define MUTATION_RATE 0.3
 
 struct Individual
 {
     std::vector<ConnectionTime> genes;
-    bool isValid = false;
+    bool isValid;
 
     // funkcje celu
     std::chrono::minutes arrivalTime = std::chrono::minutes(0);
@@ -38,7 +37,10 @@ double geoDistance(const Stop* a, const Stop* b)
     return haversine(a->getLat(), a->getLon(), b->getLat(), b->getLon());
 }
 
-static StopTime* chooseNextDeparture(std::vector<StopTime*> departureOptions, const Stop* end, std::chrono::minutes arrival, const Network& network)
+static StopTime* chooseNextDeparture(
+    std::vector<StopTime*> departureOptions,
+    const Stop* end,
+    std::chrono::minutes arrival)
 {
     std::vector<double> weights;
     double weightSum = 0.0;
@@ -52,12 +54,7 @@ static StopTime* chooseNextDeparture(std::vector<StopTime*> departureOptions, co
 
         double wait = (dep->getTime().count() - arrival.count()) * 1.0;
 
-        double connectivity =network.getStopTimes (dep->getNextStopTime()->getStop(), dep->getNextStopTime()->getTime()).size();
-
-        double weight =
-            0.2 / (nextDist + 1.0)
-            + 0.5 * connectivity
-            + 0.3 / (wait + 1.0);
+        double weight = 1.0 / (dist + 1.0) * exp(-0.15 * wait);
 
         weights.push_back(weight);
         weightSum += weight;
@@ -66,7 +63,7 @@ static StopTime* chooseNextDeparture(std::vector<StopTime*> departureOptions, co
     // cumulative distribution
     for (auto& w : weights)
         w /= weightSum;
-    
+
     for (int i = 1; i < weights.size(); i++)
         weights[i] += weights[i - 1];
 
@@ -132,7 +129,7 @@ static void evaluateIndividual(Individual& individual, std::chrono::minutes depa
 
     Trip* previousTrip = nullptr;
 
-    
+
     auto arrival = departureTime;
 
     for (const auto& connection : individual.genes)
@@ -154,8 +151,7 @@ static void evaluateIndividual(Individual& individual, std::chrono::minutes depa
     }
 }
 
-static std::vector<std::vector<int>> nonDominatedSort(
-    std::vector<Individual>& population)
+static std::vector<std::vector<int>> nonDominatedSort(std::vector<Individual>& population)
 {
     std::vector<std::vector<int>> fronts;
     std::vector<int> firstFront;
@@ -191,8 +187,7 @@ static std::vector<std::vector<int>> nonDominatedSort(
 
     int frontIndex = 0;
 
-    while (frontIndex < fronts.size() &&
-        !fronts[frontIndex].empty())
+    while (!fronts[frontIndex].empty())
     {
         std::vector<int> nextFront;
 
@@ -210,10 +205,8 @@ static std::vector<std::vector<int>> nonDominatedSort(
             }
         }
 
-        if (!nextFront.empty())
-            fronts.push_back(nextFront);
-
         frontIndex++;
+        fronts.push_back(nextFront);
     }
 
     return fronts;
@@ -238,8 +231,8 @@ void computeCrowdingDistance(
             return population[a].arrivalTime < population[b].arrivalTime;
         });
 
-    population[sorted.front()].crowdingDistance = 1e9;
-    population[sorted.back()].crowdingDistance = 1e9;
+    population[sorted.front()].crowdingDistance = INFINITY;
+    population[sorted.back()].crowdingDistance = INFINITY;
 
     double minVal = population[sorted.front()].arrivalTime.count() * 1.0;
     double maxVal = population[sorted.back()].arrivalTime.count() * 1.0;
@@ -249,18 +242,12 @@ void computeCrowdingDistance(
         for (int i = 1; i < sorted.size() - 1; i++)
         {
             population[sorted[i]].crowdingDistance +=
-               ( population[sorted[i + 1]].arrivalTime.count() 
-               - population[sorted[i - 1]].arrivalTime.count()) * 1.0
-               / (maxVal - minVal);
+                (population[sorted[i + 1]].arrivalTime.count()
+                    - population[sorted[i - 1]].arrivalTime.count()) * 1.0
+                / (maxVal - minVal);
         }
     }
 
-    // ===== CZAS JAZDY =====
-    std::sort(sorted.begin(), sorted.end(),
-        [&](int a, int b)
-        {
-            return population[a].travelTime < population[b].travelTime;
-        });
 
     // ===== CZAS JAZDY =====
     std::sort(sorted.begin(), sorted.end(),
@@ -280,9 +267,9 @@ void computeCrowdingDistance(
         for (int i = 1; i < sorted.size() - 1; i++)
         {
             population[sorted[i]].crowdingDistance +=
-               ( population[sorted[i + 1]].travelTime.count() 
-               - population[sorted[i - 1]].travelTime.count()) * 1.0
-               / (maxVal - minVal);
+                (population[sorted[i + 1]].travelTime.count()
+                    - population[sorted[i - 1]].travelTime.count()) * 1.0
+                / (maxVal - minVal);
         }
     }
 
@@ -293,8 +280,8 @@ void computeCrowdingDistance(
             return population[a].waitingTime < population[b].waitingTime;
         });
 
-    population[sorted.front()].crowdingDistance = 1e9;
-    population[sorted.back()].crowdingDistance = 1e9;
+    population[sorted.front()].crowdingDistance = INFINITY;
+    population[sorted.back()].crowdingDistance = INFINITY;
 
     minVal = population[sorted.front()].waitingTime.count() * 1.0;
     maxVal = population[sorted.back()].waitingTime.count() * 1.0;
@@ -317,8 +304,8 @@ void computeCrowdingDistance(
             return population[a].cost < population[b].cost;
         });
 
-    population[sorted.front()].crowdingDistance = 1e9;
-    population[sorted.back()].crowdingDistance = 1e9;
+    population[sorted.front()].crowdingDistance = INFINITY;
+    population[sorted.back()].crowdingDistance = INFINITY;
 
     minVal = population[sorted.front()].cost;
     maxVal = population[sorted.back()].cost;
@@ -341,8 +328,8 @@ void computeCrowdingDistance(
             return population[a].transfers < population[b].transfers;
         });
 
-    population[sorted.front()].crowdingDistance = 1e9;
-    population[sorted.back()].crowdingDistance = 1e9;
+    population[sorted.front()].crowdingDistance = INFINITY;
+    population[sorted.back()].crowdingDistance = INFINITY;
 
     minVal = population[sorted.front()].transfers;
     maxVal = population[sorted.back()].transfers;
@@ -403,7 +390,10 @@ Individual tournamentSelection(
     return p2;
 }
 
-Individual crossover(const Individual& parent1, const Individual& parent2, const Stop* end)
+Individual crossover(
+    const Individual& parent1,
+    const Individual& parent2,
+    const Stop* end)
 {
     Individual child;
 
@@ -416,7 +406,6 @@ Individual crossover(const Individual& parent1, const Individual& parent2, const
 
     std::vector<Candidate> candidates;
 
-    // znajdź wspólne punkty tras
     for (int i = 0; i < parent1.genes.size(); i++)
     {
         auto* stop1 = parent1.genes[i].to->getStop();
@@ -432,7 +421,6 @@ Individual crossover(const Individual& parent1, const Individual& parent2, const
 
             auto diff = abs((time2 - time1).count());
 
-            // zbyt duża różnica czasu
             if (diff > 30)
                 continue;
 
@@ -512,164 +500,37 @@ Individual crossover(const Individual& parent1, const Individual& parent2, const
     return child;
 }
 
-static void mutate(Individual& individual, const Network& network, const Stop* end)
+void mutate(
+    Individual& individual,
+    const Network& network,
+    const Stop* end)
 {
-    if (individual.genes.size() < 3)
+    if (individual.genes.size() < 2)
         return;
 
-    // =========================
-    // Znajdź punkty przesiadek
-    // =========================
+    int mutationPoint =
+        randomInt(0, individual.genes.size() - 1);
 
-    std::vector<int> transferPoints;
+    auto stopTime = individual.genes[mutationPoint].to;
 
-    for (int i = 1; i < individual.genes.size(); i++)
+    individual.genes.resize(mutationPoint + 1);
+
+    while (individual.genes.back().to->getStop() != end && individual.genes.size() < MAX_PATH_LENGTH)
     {
-        auto* prevTrip =
-            individual.genes[i - 1].from->getTrip();
-
-        auto* currTrip =
-            individual.genes[i].from->getTrip();
-
-        if (prevTrip != currTrip)
-            transferPoints.push_back(i);
-    }
-
-    int mutationPoint;
-
-    // =========================
-    // Preferuj mutowanie przesiadek
-    // =========================
-
-    if (!transferPoints.empty() && randomDouble(0.0, 1.0) < 0.8)
-        mutationPoint = transferPoints[randomInt(0,transferPoints.size() - 1)];
-    else
-        mutationPoint = randomInt(individual.genes.size() / 3, individual.genes.size() - 2);
-
-    // =========================
-    // Zachowaj początek trasy
-    // =========================
-
-    auto mutationStopTime = individual.genes[mutationPoint].from;
-
-    individual.genes.resize(mutationPoint);
-
-    std::unordered_set<const Stop*> visited;
-
-    for (const auto& gene : individual.genes)
-    {
-        visited.insert(gene.from->getStop());
-        visited.insert(gene.to->getStop());
-    }
-
-    // =========================
-    // Odbudowa końcówki
-    // =========================
-
-    auto currentStopTime = mutationStopTime;
-
-    while (currentStopTime && currentStopTime->getNextStopTime() && individual.genes.size() < MAX_PATH_LENGTH)
-    {
-        auto* currentStop = currentStopTime->getStop();
-
-        if (currentStop == end)
-            break;
-
-        auto departures = network.getStopTimes(currentStop, currentStopTime->getTime());
+        auto departures = network.getStopTimes(
+            stopTime->getStop(),
+            stopTime->getTime());
 
         if (departures.empty())
             break;
 
-        // =====================
-        // Filtracja odwiedzonych
-        // =====================
+        auto current = chooseNextDeparture(departures, end, individual.genes.back().to->getTime());
+        auto next = current->getNextStopTime();
 
-        std::vector<StopTime*> filtered;
+        individual.genes.push_back(
+            ConnectionTime{ current, next });
 
-        for (auto* dep : departures)
-        {
-            auto* nextStop = dep->getNextStopTime()->getStop();
-
-            if (visited.find(nextStop) == visited.end())
-                filtered.push_back(dep);
-        }
-
-        if (filtered.empty())
-            filtered = departures;
-
-        // =====================
-        // Preferuj lepsze ETA
-        // =====================
-
-        std::vector<double> weights;
-
-        double sum = 0.0;
-
-        for (auto* dep : filtered)
-        {
-            auto* next = dep->getNextStopTime();
-            double dist = geoDistance(next->getStop(), end);
-            double wait =(dep->getTime() - currentStopTime->getTime()).count();
-            double transferPenalty = 0.0;
-
-            if (dep->getTrip() != currentStopTime->getTrip())
-                transferPenalty = 8.0;
-
-            double weight = 1.0 / (dist + 1.0) + exp(-0.08 * wait) - transferPenalty;
-            weight = std::max(0.0001, weight);
-            weights.push_back(weight);
-
-            sum += weight;
-        }
-
-        // roulette wheel
-        double r = randomDouble(0.0, sum);
-        double accum = 0.0;
-
-        StopTime* selected = filtered.back();
-
-        for (int i = 0; i < filtered.size(); i++)
-        {
-            accum += weights[i];
-
-            if (r <= accum)
-            {
-                selected = filtered[i];
-                break;
-            }
-        }
-
-        auto* next = selected->getNextStopTime();
-
-        individual.genes.push_back({selected,next});
-
-        visited.insert(next->getStop());
-        currentStopTime = next;
-
-        if (next->getStop() == end)
-            break;
-    }
-}
-
-static void repair(Individual& individual, const Network& network, const Stop* end)
-{
-    if (individual.genes.empty())
-        return;
-
-    auto* current = individual.genes.back().to;
-
-    while ( current && current->getStop() != end && individual.genes.size() < MAX_PATH_LENGTH)
-    {
-        auto departures = network.getStopTimes( current->getStop(), current->getTime());
-
-        if (departures.empty())
-            break;
-
-        auto next = chooseNextDeparture(departures, end, current->getTime(), network);
-        auto* nextStop = next->getNextStopTime();
-
-        individual.genes.push_back({ next, nextStop });
-        current = nextStop;
+        stopTime = next;
     }
 }
 
@@ -697,67 +558,6 @@ static std::string pathSignature(const Individual& individual)
     return sig;
 }
 
-Individual generateIndividual(const Network& network, const Stop* start, const Stop* end, std::chrono::minutes departureTime)
-{
-    Individual individual;
-
-    auto startOptions = network.getStopTimes(start, departureTime);
-
-    std::unordered_set<const Stop*> visited;
-
-    //wylosuj rozpoczecie podrozy
-    auto currentStopTime = chooseNextDeparture(startOptions, end, departureTime, network);
-    //weź następny przystanek z tej samej trasy
-    auto nextStopTime = currentStopTime->getNextStopTime();
-    individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
-
-    while (individual.genes.back().to->getStop() != end && individual.genes.size() < MAX_PATH_LENGTH)
-    {
-        if (currentStopTime == nullptr || nextStopTime == nullptr)
-            break;
-
-        //wez opcje kontynuacji podrozy z tego przystanku
-        auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime());
-
-        //jesli brak opcji, to przerwij
-        if (departureOptions.empty())
-            break;
-
-        visited.insert(currentStopTime->getStop());
-        visited.insert(nextStopTime->getStop());
-
-        std::vector<StopTime*> filteredDepartureOptions;
-        for (auto& el : departureOptions)
-        {
-            auto nextStop = el->getNextStopTime()->getStop();
-
-            if (visited.find(nextStop) == visited.end())
-                filteredDepartureOptions.push_back(el);
-        }
-
-        if (filteredDepartureOptions.empty())
-            filteredDepartureOptions = departureOptions;
-
-        //85% szans, że wybierzemy kontynuacje tej samej trasy
-        auto it = std::find_if(filteredDepartureOptions.begin(), filteredDepartureOptions.end(),
-            [&](const auto& elem)
-            {
-                return elem->getTrip() == currentStopTime->getTrip();
-            });
-
-        if (it != filteredDepartureOptions.end() && randomInt(0, 100) < std::max(85, (int)(95 - individual.genes.size())))
-            currentStopTime = *it;
-        else
-            currentStopTime = chooseNextDeparture(filteredDepartureOptions, end, nextStopTime->getTime(), network);
-
-        //weź następny przystanek z tej samej trasy
-        nextStopTime = currentStopTime->getNextStopTime();
-        individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
-    }
-
-    return individual;
-}
-
 std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop* start, const Stop* end, std::chrono::minutes departureTime)
 {
     auto startOptions = network.getStopTimes(start, departureTime);
@@ -770,7 +570,54 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
     for (int i = 0; i < POPULATION; i++)
     {
-        population.push_back(generateIndividual(network, start, end, departureTime));
+        Individual individual;
+
+        std::unordered_set<const Stop*> visited;
+
+        //wylosuj rozpoczecie podrozy
+        auto currentStopTime = chooseNextDeparture(startOptions, end, departureTime);
+        //weź następny przystanek z tej samej trasy
+        auto nextStopTime = currentStopTime->getNextStopTime();
+        individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
+
+        while (individual.genes.back().to->getStop() != end && individual.genes.size() < MAX_PATH_LENGTH)
+        {
+            if (currentStopTime == nullptr || nextStopTime == nullptr)
+                break;
+
+            //wez opcje kontynuacji podrozy z tego przystanku
+            auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime());
+
+            visited.insert(currentStopTime->getStop());
+            visited.insert(nextStopTime->getStop());
+
+            std::vector<StopTime*> filteredDepartureOptions;
+            for (auto& el : departureOptions)
+                if (visited.find(el->getNextStopTime()->getStop()) == visited.end())
+                    filteredDepartureOptions.push_back(el);
+
+            //jesli brak opcji, to przerwij
+            if (filteredDepartureOptions.empty())
+                break;
+
+            //85% szans, że wybierzemy kontynuacje tej samej trasy
+            auto it = std::find_if(filteredDepartureOptions.begin(), filteredDepartureOptions.end(),
+                [&](const auto& elem)
+                {
+                    return elem->getTrip() == currentStopTime->getTrip();
+                });
+
+            if (it != filteredDepartureOptions.end() && randomInt(0, 100) < 95)
+                currentStopTime = *it;
+            else
+                currentStopTime = chooseNextDeparture(filteredDepartureOptions, end, nextStopTime->getTime());
+
+            //weź następny przystanek z tej samej trasy
+            nextStopTime = currentStopTime->getNextStopTime();
+            individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
+        }
+
+        population.push_back(individual);
     }
 
     for (int generation = 0; generation < GENERATIONS; generation++)
@@ -788,6 +635,8 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         // potomstwo
         std::vector<Individual> offspring;
 
+        std::unordered_set<std::string> offspringSignatures;
+
         while (offspring.size() < population.size())
         {
             auto parent1 = tournamentSelection(population, end);
@@ -795,12 +644,17 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
             auto child = crossover(parent1, parent2, end);
 
-            if (randomDouble(0.0, 1.0) < MUTATION_RATE)
+            if (randomDouble(0.0, 1.0) < 0.1)
                 mutate(child, network, end);
 
-            repair(child, network, end);
-
             evaluateIndividual(child, departureTime, end);
+
+            auto sig = pathSignature(child);
+
+            if (offspringSignatures.find(sig) != offspringSignatures.end())
+                continue;
+
+            offspringSignatures.insert(sig);
 
             offspring.push_back(child);
         }
@@ -865,11 +719,6 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
                 break;
             }
         }
-        while (population.size() < POPULATION)
-        {
-            population.push_back(
-                generateIndividual(network, start, end, departureTime));
-        }
     }
 
     auto fronts = nonDominatedSort(population);
@@ -887,10 +736,10 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
     }
 
     std::sort(results.begin(), results.end(), [](const Path& p1, const Path& p2) {
-        if(p1.getArrivalTime() == p2.getArrivalTime())
+        if (p1.getArrivalTime() == p2.getArrivalTime())
             return p1.getTransfers() < p2.getTransfers();
         return p1.getArrivalTime() < p2.getArrivalTime();
-    });
+        });
 
 
     /*for (const auto& path : results)
