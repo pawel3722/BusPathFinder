@@ -1,13 +1,13 @@
-#include "GeneticAlgorithm.h"
-
 #include <random>
 #include <algorithm>
 #include <iostream>
-#include <unordered_set>
 
-#define M_PI 3.14159265
-#define POPULATION 30
-#define GENERATIONS 100
+#include "GeneticAlgorithm.h"
+#include "Functions.h"
+
+
+#define POPULATION 100
+#define GENERATIONS 150
 #define MAX_PATH_LENGTH 50
 #define MUTATION_RATE 0.3
 
@@ -32,46 +32,6 @@ struct Individual
     std::vector<int> dominated = {};
 };
 
-static std::mt19937 rng(std::random_device{}());
-
-static int randomInt(int a, int b)
-{
-	if (a == b)
-		return a;
-    if (a > b)
-        std::swap(a, b);
-    std::uniform_int_distribution<int> dist(a, b);
-    return dist(rng);
-}
-
-static double randomDouble(double a, double b)
-{
-    std::uniform_real_distribution<double> dist(a, b);
-    return dist(rng);
-}
-
-static double haversine(double lat1, double lon1,
-    double lat2, double lon2)
-{
-    // distance between latitudes
-    // and longitudes
-    double dLat = (lat2 - lat1) *
-        M_PI / 180.0;
-    double dLon = (lon2 - lon1) *
-        M_PI / 180.0;
-
-    // convert to radians
-    lat1 = (lat1)*M_PI / 180.0;
-    lat2 = (lat2)*M_PI / 180.0;
-
-    // apply formulae
-    double a = pow(sin(dLat / 2), 2) +
-        pow(sin(dLon / 2), 2) *
-        cos(lat1) * cos(lat2);
-    double rad = 6371;
-    double c = 2 * asin(sqrt(a));
-    return rad * c;
-}
 
 double geoDistance(const Stop* a, const Stop* b)
 {
@@ -106,7 +66,7 @@ static StopTime* chooseNextDeparture(std::vector<StopTime*> departureOptions, co
     // cumulative distribution
     for (auto& w : weights)
         w /= weightSum;
-
+    
     for (int i = 1; i < weights.size(); i++)
         weights[i] += weights[i - 1];
 
@@ -302,8 +262,15 @@ void computeCrowdingDistance(
             return population[a].travelTime < population[b].travelTime;
         });
 
-    population[sorted.front()].crowdingDistance = 1e9;
-    population[sorted.back()].crowdingDistance = 1e9;
+    // ===== CZAS JAZDY =====
+    std::sort(sorted.begin(), sorted.end(),
+        [&](int a, int b)
+        {
+            return population[a].travelTime < population[b].travelTime;
+        });
+
+    population[sorted.front()].crowdingDistance = INFINITY;
+    population[sorted.back()].crowdingDistance = INFINITY;
 
     minVal = population[sorted.front()].travelTime.count() * 1.0;
     maxVal = population[sorted.back()].travelTime.count() * 1.0;
@@ -402,21 +369,31 @@ Individual tournamentSelection(
     const auto& p1 = population[a];
     const auto& p2 = population[b];
 
-    // 1. rank (Pareto)
+    // rank
     if (p1.rank < p2.rank)
-        return p1;
+    {
+        if (randomDouble(0.0, 1.0) < 0.8)
+            return p1;
+
+        return p2;
+    }
 
     if (p2.rank < p1.rank)
-        return p2;
+    {
+        if (randomDouble(0.0, 1.0) < 0.8)
+            return p2;
 
-    // 2. crowding distance
+        return p1;
+    }
+
+    // crowding
     if (p1.crowdingDistance > p2.crowdingDistance)
         return p1;
 
     if (p2.crowdingDistance > p1.crowdingDistance)
         return p2;
 
-    // 3. HEURYSTYKA GPS
+    // GPS heuristic
     double h1 = heuristicToGoal(p1, end);
     double h2 = heuristicToGoal(p2, end);
 
@@ -461,15 +438,17 @@ Individual crossover(const Individual& parent1, const Individual& parent2, const
 
             double dist = geoDistance(stop1, end);
 
-            candidates.push_back({i, j, 1.0 / (dist + 1.0) });
+            candidates.push_back({
+                i,
+                j,
+                1.0 / (dist + 1.0)
+                });
         }
     }
 
-    // brak wspólnego punktu
     if (candidates.empty())
         return randomInt(0, 1) ? parent1 : parent2;
 
-    // losowanie weighted
     double sum = 0.0;
 
     for (const auto& c : candidates)
@@ -492,12 +471,17 @@ Individual crossover(const Individual& parent1, const Individual& parent2, const
         }
     }
 
-    // zbuduj dziecko
-    child.genes.insert(child.genes.end(), parent1.genes.begin(), parent1.genes.begin() + selected.i + 1);
+    child.genes.insert(
+        child.genes.end(),
+        parent1.genes.begin(),
+        parent1.genes.begin() + selected.i + 1);
 
-    child.genes.insert(child.genes.end(), parent2.genes.begin() + selected.j + 1, parent2.genes.end());
+    child.genes.insert(
+        child.genes.end(),
+        parent2.genes.begin() + selected.j + 1,
+        parent2.genes.end());
 
-    // usuń pętle
+    // cycle repair
     std::unordered_map<const Stop*, int> visited;
     std::vector<ConnectionTime> repaired;
 
@@ -507,19 +491,14 @@ Individual crossover(const Individual& parent1, const Individual& parent2, const
 
         auto it = visited.find(stop);
 
-        // znaleziono pętlę
         if (it != visited.end())
         {
-            // usuń fragment pętli
             repaired.resize(it->second + 1);
 
-            // odbuduj visited
             visited.clear();
 
             for (int i = 0; i < repaired.size(); i++)
-            {
                 visited[repaired[i].to->getStop()] = i;
-            }
 
             continue;
         }
@@ -907,12 +886,17 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         results.push_back(path);
     }
 
-    std::sort(results.begin(), results.end(), [](const Path& p1, const Path& p2) {return p1.getTransfers() < p2.getTransfers();});
+    std::sort(results.begin(), results.end(), [](const Path& p1, const Path& p2) {
+        if(p1.getArrivalTime() == p2.getArrivalTime())
+            return p1.getTransfers() < p2.getTransfers();
+        return p1.getArrivalTime() < p2.getArrivalTime();
+    });
 
-    for (const auto& path : results)
+
+    /*for (const auto& path : results)
     {
         std::cout << path << std::endl;
-    }
+    }*/
 
     return results;
 }

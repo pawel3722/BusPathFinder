@@ -2,9 +2,6 @@
 #include <memory>
 #include <unordered_map>
 #include "Stop.h"
-#include "Connection.h"
-#include "Route.h"
-#include "Service.h"
 #include "Trip.h"
 #include "StopTime.h"
 #include <set>
@@ -53,6 +50,8 @@ public:
         auto it = stops.find(id);
         return it != stops.end() ? it->second.get() : nullptr;
     }
+
+    const Stop* getRandomStop() const;
 
     std::vector<StopTime*> getStopTimes(const Stop* stop, std::chrono::minutes minTime) const;    
 };

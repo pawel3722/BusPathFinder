@@ -1,4 +1,5 @@
 #include "NetworkLoader.h"
+#include "Functions.h"
 
 #include <fstream>
 #include "json.hpp"
@@ -131,24 +132,4 @@ Network NetworkLoader::load(
         std::move(stopTimes),
         std::move(trips)
     );
-}
-
-std::chrono::minutes NetworkLoader::parseTime(const std::string& str)
-{
-    // obsługa HH:MM lub HH:MM:SS
-
-    if (str.size() != 5 && str.size() != 8)
-        throw std::invalid_argument("Invalid time format");
-
-    int hour = std::stoi(str.substr(0, 2));
-    int minute = std::stoi(str.substr(3, 2));
-
-    // GTFS pozwala na godziny > 23
-    // np. 26:30:00
-
-    if (hour < 0 || minute < 0 || minute > 59)
-        throw std::out_of_range("Time out of range");
-
-    return std::chrono::hours(hour)
-        + std::chrono::minutes(minute);
 }
