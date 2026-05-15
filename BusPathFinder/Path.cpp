@@ -7,6 +7,12 @@
 
 std::ostream& operator<<(std::ostream& os, const Path& path)
 {
+	if (!path.message.empty())
+	{
+		os << path.message << std::endl;
+		return os;
+	}
+
 	os << "================PATH================"<< std::endl;
 	os << "Arrival time: " << formatTime(path.arrivalTime) << std::endl;
 	os << "Travel time:  " << formatTime(path.travelTime) << std::endl;

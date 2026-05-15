@@ -25,6 +25,10 @@ int randomInt(int a, int b)
 
 double randomDouble(double a, double b)
 {
+    if (a == b)
+        return a;
+    if (a > b)
+        std::swap(a, b);
     std::uniform_real_distribution<double> dist(a, b);
     return dist(rng);
 }

@@ -33,7 +33,7 @@ int main()
         const Stop* start = nullptr;
         const Stop* end = nullptr;
         std::chrono::minutes departureTime;
-
+        std::cout << "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||QUERY||||||||||||||||||||" << std::endl;
         std::cout << "Start stop ID: ";
         std::cin >> startId;
 
@@ -116,14 +116,14 @@ int main()
             std::cout << "ACO exception: " << ex.what() << std::endl;
         }
 
-        std::cout << "+++++++++++++++++++++++++++GEN+++++++++++++++++++++++++++" << std::endl;
+        std::cout << "++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++" << std::endl;
 
         for (const auto& path : pathsGen)
         {
             std::cout << path << std::endl;
         }
 
-        std::cout << "+++++++++++++++++++++++++++ACO+++++++++++++++++++++++++++" << std::endl;
+        std::cout << "++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++" << std::endl;
 
         for (const auto& path : pathsAco)
         {

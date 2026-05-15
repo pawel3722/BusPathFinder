@@ -5,8 +5,8 @@
 
 struct ConnectionTime
 {
-	StopTime* from;
-	StopTime* to;
+	const StopTime* from;
+	const StopTime* to;
 
 	bool operator== (const ConnectionTime& other) const
 	{

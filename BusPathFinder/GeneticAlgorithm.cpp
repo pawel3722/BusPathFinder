@@ -43,11 +43,11 @@ static StopTime* chooseNextDeparture(
     {
         double currentDist = geoDistance(dep->getStop(), end);
         double nextDist = geoDistance(dep->getNextStopTime()->getStop(), end);
-        double dist = nextDist - currentDist;
+        double dist = currentDist - nextDist;
 
         double wait = (dep->getTime().count() - arrival.count()) * 1.0;
 
-        double weight = 1.0 / (dist + 1.0) * exp(-0.15 * wait);
+        double weight = 1.0 / (dist + 1.0) * exp(-0.03 * wait);
 
         weights.push_back(weight);
         weightSum += weight;
@@ -487,7 +487,40 @@ Individual crossover(
     return child;
 }
 
-void mutate(
+static void delayStart(Individual& individual,
+    const Network& network)
+{
+    int index = 0;
+    const StopTime* transferPointArr = nullptr;
+    const StopTime* transferPointDep = nullptr;
+    Trip* currentTrip = nullptr;
+
+    for (; index < individual.genes.size(); index++)
+    {
+        if (currentTrip && currentTrip != individual.genes[index].from->getTrip())
+        {
+            transferPointArr = individual.genes[index - 1].to;
+            transferPointDep = individual.genes[index].from;
+            break;
+        }
+        currentTrip = individual.genes[index].from->getTrip();
+    }
+    if (transferPointArr && transferPointDep)
+    {
+        auto laterArr = network.getLaterDeparture(transferPointArr);
+        if (laterArr && laterArr->getTime() < transferPointDep->getTime())
+        {
+            for (int i = 0; i < index; i++)
+            {
+                auto dep = network.getLaterDeparture(individual.genes[i].from);
+                auto arr = network.getLaterDeparture(individual.genes[i].to);
+                individual.genes[i] = ConnectionTime{ dep,arr };
+            }
+        }
+    }
+}
+
+static void mutate(
     Individual& individual,
     const Network& network,
     const Stop* end)
@@ -506,7 +539,8 @@ void mutate(
     {
         auto departures = network.getStopTimes(
             stopTime->getStop(),
-            stopTime->getTime());
+            stopTime->getTime(),
+            stopTime->getTrip());
 
         if (departures.empty())
             break;
@@ -565,8 +599,10 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 {
     auto startOptions = network.getStopTimes(start, departureTime);
 
-    if (startOptions.empty() || start == end)
-        return { Path() };
+    if (startOptions.empty())
+        return { Path("No departures from starting stop!") };
+    if(start == end)
+        return { Path("Starting stop equals destination!") };
 
     // populacja
     std::vector<Individual> population;
@@ -588,7 +624,7 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
                 break;
 
             //wez opcje kontynuacji podrozy z tego przystanku
-            auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime());
+            auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime(), nextStopTime->getTrip());
 
             visited.insert(currentStopTime->getStop());
             visited.insert(nextStopTime->getStop());
@@ -626,7 +662,14 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
     {
         // ocena
         for (auto& individual : population)
+        {
+            //sprobuj opoznic rozpoczecie podrozy
+            if (individual.transfers > 0 && individual.isValid)
+            {
+                delayStart(individual, network);
+            }
             evaluateIndividual(individual, departureTime, end);
+        }
 
         // sortowanie Pareto
         auto fronts = nonDominatedSort(population);
@@ -747,11 +790,8 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         return p1.getArrivalTime() < p2.getArrivalTime();
         });
 
-
-    /*for (const auto& path : results)
-    {
-        std::cout << path << std::endl;
-    }*/
+    if (results.empty())
+        results.push_back(Path("Journey from start to end was not found!"));
 
     return results;
 }
