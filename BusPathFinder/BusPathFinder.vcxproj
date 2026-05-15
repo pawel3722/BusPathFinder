@@ -123,6 +123,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ACOAlgorithm.cpp" />
     <ClCompile Include="BusPathFinder.cpp" />
     <ClCompile Include="Functions.cpp" />
     <ClCompile Include="GeneticAlgorithm.cpp" />
@@ -137,6 +138,7 @@
     <None Include="network.json" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ACOAlgorithm.h" />
     <ClInclude Include="Functions.h" />
     <ClInclude Include="GeneticAlgorithm.h" />
     <ClInclude Include="IAlgorithm.h" />

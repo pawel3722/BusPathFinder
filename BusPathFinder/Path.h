@@ -14,9 +14,9 @@ struct PathNode
 class Path
 {
 	std::vector<PathNode> nodes;
-	std::chrono::minutes arrivalTime;
-	std::chrono::minutes travelTime;
-	std::chrono::minutes waitingTime;
+	std::chrono::minutes arrivalTime = std::chrono::minutes(0);
+	std::chrono::minutes travelTime = std::chrono::minutes(0);
+	std::chrono::minutes waitingTime = std::chrono::minutes(0);
 	double cost;
 	int transfers;
 public:

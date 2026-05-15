@@ -1,10 +1,12 @@
 ﻿#include <iostream>
 #include <windows.h>
 #include <string>
+#include <future>
 #include "NetworkLoader.h"
 #include "GeneticAlgorithm.h"
 #include "RouteFinder.h"
 #include "Functions.h" 
+#include "ACOAlgorithm.h"
 
 int main()
 {
@@ -18,7 +20,9 @@ int main()
     auto network = NetworkLoader::load("gd_stops.json","gd_trips.json","gd_stop_times.json");
 
     GeneticAlgorithm genAlg;
+    ACOAlgorithm acoAlg;
     RouteFinder genAlgRouteFinder(network, genAlg);
+    RouteFinder acoAlgRouteFinder(network, acoAlg);
 
     int startId = 0;
     int endId = 0;
@@ -74,13 +78,54 @@ int main()
             }
         }
 
-        auto paths = genAlgRouteFinder.findRoute(
-            start,
-            end,
-            departureTime
-        );
+        std::vector<Path> pathsGen;
+        std::vector<Path> pathsAco;
 
-        for (const auto& path : paths)
+        auto futureGen = std::async(std::launch::async, [&]()
+            {
+                return genAlgRouteFinder.findRoute(
+                    start,
+                    end,
+                    departureTime);
+            });
+
+        auto futureAco = std::async(std::launch::async, [&]()
+            {
+                return acoAlgRouteFinder.findRoute(
+                    start,
+                    end,
+                    departureTime);
+            });
+
+        // bariera — czekamy na oba wyniki
+        try
+        {
+            pathsGen = futureGen.get();
+        }
+        catch (const std::exception& ex)
+        {
+            std::cout << "GEN exception: " << ex.what() << std::endl;
+        }
+
+        try
+        {
+            pathsAco = futureAco.get();
+        }
+        catch (const std::exception& ex)
+        {
+            std::cout << "ACO exception: " << ex.what() << std::endl;
+        }
+
+        std::cout << "+++++++++++++++++++++++++++GEN+++++++++++++++++++++++++++" << std::endl;
+
+        for (const auto& path : pathsGen)
+        {
+            std::cout << path << std::endl;
+        }
+
+        std::cout << "+++++++++++++++++++++++++++ACO+++++++++++++++++++++++++++" << std::endl;
+
+        for (const auto& path : pathsAco)
         {
             std::cout << path << std::endl;
         }

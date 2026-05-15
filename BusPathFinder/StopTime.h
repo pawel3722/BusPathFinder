@@ -7,6 +7,11 @@ struct ConnectionTime
 {
 	StopTime* from;
 	StopTime* to;
+
+	bool operator== (const ConnectionTime& other) const
+	{
+		return from == other.from && to == other.to;
+	}
 };
 
 class StopTime

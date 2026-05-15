@@ -1,8 +1,7 @@
 #include "Functions.h"
+#include "Stop.h"
 
 #define M_PI 3.14159265
-
-static std::mt19937 rng(std::random_device{}());
 
 std::chrono::minutes randomTime()
 {
@@ -86,4 +85,9 @@ std::chrono::minutes parseTime(const std::string& str)
 
     return std::chrono::hours(hour)
         + std::chrono::minutes(minute);
+}
+
+double geoDistance(const Stop* a, const Stop* b)
+{
+    return haversine(a->getLat(), a->getLon(), b->getLat(), b->getLon());
 }
