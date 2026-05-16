@@ -10,6 +10,9 @@
 #define GENERATIONS 150
 #define MAX_PATH_LENGTH 50
 
+#define MIN_TRANSFER_DURATION 3
+#define MAX_DEPARTURES_PER_ROUTE 1
+
 struct Individual
 {
     std::vector<ConnectionTime> genes;
@@ -41,13 +44,21 @@ static StopTime* chooseNextDeparture(
 
     for (auto* dep : departureOptions)
     {
+        //for debugging
+        auto trip = dep->getTrip();
+        auto tripName = trip->getLine() + " " + trip->getDirection();
+        auto next = dep->getNextStopTime()->getStop()->getName();
+        auto time = dep->getTime();
+
         double currentDist = geoDistance(dep->getStop(), end);
         double nextDist = geoDistance(dep->getNextStopTime()->getStop(), end);
         double dist = currentDist - nextDist;
+        if (dist < 0)
+            dist = 0.001;
 
         double wait = (dep->getTime().count() - arrival.count()) * 1.0;
 
-        double weight = 1.0 / (dist + 1.0) * exp(-0.03 * wait);
+        double weight = exp(dist) * exp(-0.1 * (wait - MIN_TRANSFER_DURATION));
 
         weights.push_back(weight);
         weightSum += weight;
@@ -487,7 +498,7 @@ Individual crossover(
     return child;
 }
 
-static void delayStart(Individual& individual,
+static bool delayStart(Individual& individual,
     const Network& network)
 {
     int index = 0;
@@ -517,7 +528,9 @@ static void delayStart(Individual& individual,
                 individual.genes[i] = ConnectionTime{ dep,arr };
             }
         }
+        return true;
     }
+    return false;
 }
 
 static void mutate(
@@ -540,7 +553,9 @@ static void mutate(
         auto departures = network.getStopTimes(
             stopTime->getStop(),
             stopTime->getTime(),
-            stopTime->getTrip());
+            stopTime->getTrip(),
+            MIN_TRANSFER_DURATION,
+            MAX_DEPARTURES_PER_ROUTE);
 
         if (departures.empty())
             break;
@@ -624,7 +639,7 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
                 break;
 
             //wez opcje kontynuacji podrozy z tego przystanku
-            auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime(), nextStopTime->getTrip());
+            auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime(), nextStopTime->getTrip(), MIN_TRANSFER_DURATION, MAX_DEPARTURES_PER_ROUTE);
 
             visited.insert(currentStopTime->getStop());
             visited.insert(nextStopTime->getStop());
@@ -663,12 +678,13 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         // ocena
         for (auto& individual : population)
         {
+            evaluateIndividual(individual, departureTime, end);
             //sprobuj opoznic rozpoczecie podrozy
             if (individual.transfers > 0 && individual.isValid)
             {
-                delayStart(individual, network);
+                if(delayStart(individual, network));
+                    evaluateIndividual(individual, departureTime, end);
             }
-            evaluateIndividual(individual, departureTime, end);
         }
 
         // sortowanie Pareto

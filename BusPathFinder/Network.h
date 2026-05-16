@@ -53,6 +53,6 @@ public:
 
     const Stop* getRandomStop() const;
 
-    std::vector<StopTime*> getStopTimes(const Stop* stop, std::chrono::minutes minTime, const Trip* trip = nullptr) const;
+    std::vector<StopTime*> getStopTimes(const Stop* stop, std::chrono::minutes minTime, const Trip* trip = nullptr, int minTransferDuration = 0, int maxDeparturesPerRoute = 0) const;
     const StopTime* getLaterDeparture(const StopTime* stopTime) const;
 };

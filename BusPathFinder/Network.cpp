@@ -1,9 +1,6 @@
 #include "Network.h"
 #include "Functions.h"
 
-#define MIN_TRANSFER_DURATION 3
-#define MAX_DEPARTURES_PER_ROUTE 3
-
 const Stop* Network::getRandomStop() const
 {
     auto size = stops.size();
@@ -12,7 +9,7 @@ const Stop* Network::getRandomStop() const
     return it->second.get();
 }
 
-std::vector<StopTime*> Network::getStopTimes(const Stop* stop, std::chrono::minutes minTime, const Trip* trip) const
+std::vector<StopTime*> Network::getStopTimes(const Stop* stop, std::chrono::minutes minTime, const Trip* trip, int minTransferDuration, int maxDeparturesPerRoute) const
 {
     std::vector<StopTime*> result;
 
@@ -32,7 +29,7 @@ std::vector<StopTime*> Network::getStopTimes(const Stop* stop, std::chrono::minu
                 bool isTransfer = trip && dep->getTrip() != trip;
 
                 auto requiredTime = isTransfer
-                    ? minTime + std::chrono::minutes(MIN_TRANSFER_DURATION)
+                    ? minTime + std::chrono::minutes(minTransferDuration)
                     : minTime;
 
                 if (dep->getTime() < requiredTime)
@@ -40,8 +37,8 @@ std::vector<StopTime*> Network::getStopTimes(const Stop* stop, std::chrono::minu
 
                 result.push_back(dep);
                 added++;
-                /*if (!isTransfer || added >= MAX_DEPARTURES_PER_ROUTE)
-                    break;*/
+                if ((!isTransfer && !trip) || added >= maxDeparturesPerRoute)
+                    break;
             }
         }
     return result;

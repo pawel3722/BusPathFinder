@@ -83,18 +83,22 @@ int main()
 
         auto futureGen = std::async(std::launch::async, [&]()
             {
-                return genAlgRouteFinder.findRoute(
+                auto res = genAlgRouteFinder.findRoute(
                     start,
                     end,
                     departureTime);
+                std::cout << "GEN ready! " << std::endl;
+                return res;
             });
 
         auto futureAco = std::async(std::launch::async, [&]()
             {
-                return acoAlgRouteFinder.findRoute(
+                auto res = acoAlgRouteFinder.findRoute(
                     start,
                     end,
                     departureTime);
+                std::cout << "ACO ready! " << std::endl;
+                return res;
             });
 
         // bariera — czekamy na oba wyniki
