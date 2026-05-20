@@ -12,6 +12,7 @@
 
 #define MIN_TRANSFER_DURATION 3
 #define MAX_DEPARTURES_PER_ROUTE 1
+#define SAME_TRIP_PROB 0.95
 
 struct Individual
 {
@@ -52,13 +53,14 @@ static StopTime* chooseNextDeparture(
 
         double currentDist = geoDistance(dep->getStop(), end);
         double nextDist = geoDistance(dep->getNextStopTime()->getStop(), end);
-        double dist = currentDist - nextDist;
-        if (dist < 0)
-            dist = 0.001;
+        double progress = currentDist - nextDist;
+        /*if (dist < 0)
+            dist = 0.001;*/
 
         double wait = (dep->getTime().count() - arrival.count()) * 1.0;
 
-        double weight = exp(dist) * exp(-0.1 * (wait - MIN_TRANSFER_DURATION));
+        double noise = randomDouble(0.85, 1.15);
+        double weight = noise * exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_DURATION));
 
         weights.push_back(weight);
         weightSum += weight;
@@ -414,7 +416,7 @@ Individual crossover(
             auto* stop2 = parent2.genes[j].to->getStop();
             auto time2 = parent2.genes[j].to->getTime();
 
-            if (stop1 != stop2 || time2 < time1)
+            if (stop1 != stop2 || time1.count() + MIN_TRANSFER_DURATION > time2.count())
                 continue;
 
             auto diff = abs((time2 - time1).count());
@@ -534,13 +536,6 @@ static bool fixWaitingTimes(Individual& individual,
             individual.genes[j] = { network.getEarlierDeparture(from), network.getEarlierDeparture(to) };
         }
 
-        for (int k = 1; k < individual.genes.size(); k++)
-        {
-            if (individual.genes[k - 1].to->getTime() > individual.genes[k].from->getTime() || individual.genes[k - 1].to->getStop() != individual.genes[k].from->getStop())
-                int x = 9;
-        }
-
-
         return true;
     }
 
@@ -558,12 +553,6 @@ static bool fixWaitingTimes(Individual& individual,
             auto from = individual.genes[j].from;
             auto to = individual.genes[j].to;
             individual.genes[j] = { network.getLaterDeparture(from), network.getLaterDeparture(to) };
-        }
-
-        for (int k = 1; k < individual.genes.size(); k++)
-        {
-            if (individual.genes[k - 1].to->getTime() > individual.genes[k].from->getTime() || individual.genes[k - 1].to->getStop() != individual.genes[k].from->getStop())
-                int x = 9;
         }
 
         return true;
@@ -631,12 +620,6 @@ static bool skipConnection(Individual& individual, const Network& network)
                 newGenes.push_back(*it);
             }
 
-            for (int k = 1; k < newGenes.size(); k++)
-            {
-                if (newGenes[k - 1].to->getTime() > newGenes[k].from->getTime() || newGenes[k - 1].to->getStop() != newGenes[k].from->getStop())
-                    int x = 9;
-            }
-
             individual.genes = newGenes;
             return true;
         }
@@ -674,11 +657,7 @@ static void mutate(
         auto current = chooseNextDeparture(departures, end, individual.genes.back().to->getTime());
         auto next = current->getNextStopTime();
 
-        if (!individual.genes.empty() && current->getTime() < individual.genes.back().to->getTime())
-            int x = 9;
-
-        individual.genes.push_back(
-            ConnectionTime{ current, next });
+        individual.genes.push_back(ConnectionTime{ current, next });
 
         stopTime = next;
     }
@@ -745,8 +724,6 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         //wylosuj rozpoczecie podrozy
         auto currentStopTime = chooseNextDeparture(startOptions, end, departureTime);
         auto nextStopTime = currentStopTime->getNextStopTime();
-        if (!individual.genes.empty() && currentStopTime->getTime() < individual.genes.back().to->getTime())
-            int x = 9;
 
         individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
 
@@ -777,18 +754,13 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
                     return elem->getTrip() == currentStopTime->getTrip();
                 });
 
-            if (it != filteredDepartureOptions.end() && randomInt(0, 100) < 95)
+            if (it != filteredDepartureOptions.end() && randomDouble(0.0, 1.0) < SAME_TRIP_PROB)
                 currentStopTime = *it;
             else
                 currentStopTime = chooseNextDeparture(filteredDepartureOptions, end, nextStopTime->getTime());
 
             //weź następny przystanek z tej samej trasy
             nextStopTime = currentStopTime->getNextStopTime();
-            
-            
-            if (!individual.genes.empty() && currentStopTime->getTime() < individual.genes.back().to->getTime())
-                int x = 9;
-
 
             individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
         }

@@ -37,7 +37,7 @@ std::vector<StopTime*> Network::getStopTimes(const Stop* stop, std::chrono::minu
 
                 result.push_back(dep);
                 added++;
-                if ((!isTransfer && !trip) || added >= maxDeparturesPerRoute)
+                if ((!isTransfer && trip) || added >= maxDeparturesPerRoute)
                     break;
             }
         }
@@ -85,12 +85,6 @@ const StopTime* Network::getCommonStop(Trip* t1, Trip* t2, const StopTime* start
                 break;
         }
     }
-
-
-    for (const auto& el1 : st1)
-        for (const auto& el2 : st2)
-            if (el1->getStop() == el2->getStop())
-                stop = el2;
 
     return stop;
 }

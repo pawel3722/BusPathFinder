@@ -59,12 +59,14 @@ int main()
             if (!start)
             {
                 std::cout << "Invalid start stop ID\n";
+                startId = 0;
                 continue;
             }
 
             if (!end)
             {
                 std::cout << "Invalid end stop ID\n";
+                startId = 0;
                 continue;
             }
 
@@ -91,7 +93,7 @@ int main()
                 return res;
             });
 
-        /*auto futureAco = std::async(std::launch::async, [&]()
+        auto futureAco = std::async(std::launch::async, [&]()
             {
                 auto res = acoAlgRouteFinder.findRoute(
                     start,
@@ -99,7 +101,7 @@ int main()
                     departureTime);
                 std::cout << "ACO ready! " << std::endl;
                 return res;
-            });*/
+            });
 
         // bariera — czekamy na oba wyniki
         try
@@ -111,14 +113,14 @@ int main()
             std::cout << "GEN exception: " << ex.what() << std::endl;
         }
 
-        /*try
+        try
         {
             pathsAco = futureAco.get();
         }
         catch (const std::exception& ex)
         {
             std::cout << "ACO exception: " << ex.what() << std::endl;
-        }*/
+        }
 
         std::cout << "++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++" << std::endl;
 

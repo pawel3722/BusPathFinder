@@ -3,6 +3,7 @@
 #include <random>
 #include <algorithm>
 #include <unordered_set>
+#include <array>
 
 #include "ACOAlgorithm.h"
 #include "Functions.h"
@@ -10,17 +11,32 @@
 #define ANT_COUNT 100
 #define ITERATIONS 100
 #define MAX_PATH_LENGTH 50
-#define MAX_PARETO_SIZE 100
+#define MAX_ARCHIVE_SIZE 100
 
-#define ALPHA 0.7
-#define BETA 3.0
+#define ALPHA 1.0
+#define BETA 1.0
 #define EVAPORATION 0.15
+
+#define MIN_TRANSFER_DURATION 3
+#define MAX_DEPARTURES_PER_ROUTE 5
+#define SAME_TRIP_PROB 0.9
+
+enum Objective
+{
+    ARRIVAL,
+    TRAVEL,
+    WAITING,
+    TRANSFERS,
+    COST 
+};
 
 struct Ant
 {
     std::vector<ConnectionTime> path;
 
     bool isValid = false;
+
+    Objective objective;
 
     std::chrono::minutes arrivalTime = std::chrono::minutes::max();
     std::chrono::minutes travelTime = std::chrono::minutes::max();
@@ -30,71 +46,14 @@ struct Ant
     double distanceToGoal = 1e9;
 
     int transfers = 0;
-
-    bool operator==(const Ant& other) const
-    {
-        return path == other.path;
-    }
-};
-
-static std::string pathSignature(const Ant& ant)
-{
-    std::string sig;
-
-    for (const auto& node : ant.path)
-    {
-        sig += node.from->getTrip()->getId();
-
-        sig += "|";
-
-        sig += std::to_string(node.from->getStop()->getId());
-
-        sig += "|";
-
-        sig += std::to_string(node.from->getTime().count());
-
-        sig += "->";
-    }
-    if (ant.path.size() > 0)
-    {
-        auto node = ant.path.back();
-
-        sig += node.to->getTrip()->getId();
-
-        sig += "|";
-
-        sig += std::to_string(
-            node.to->getStop()->getId());
-
-        sig += "|";
-
-        sig += std::to_string(
-            node.to->getTime().count());
-    }
-
-    return sig;
-}
-
-struct AntHash
-{
-    size_t operator()(const Ant& c) const
-    {
-        size_t h1 =
-            std::hash<std::string>()(pathSignature(c));
-
-        return h1;
-    }
 };
 
 struct ConnectionTimeHash
 {
     size_t operator()(const ConnectionTime& c) const
     {
-        size_t h1 =
-            std::hash<const void*>()(c.from);
-
-        size_t h2 =
-            std::hash<const void*>()(c.to);
+        size_t h1 = std::hash<const void*>()(c.from);
+        size_t h2 = std::hash<const void*>()(c.to);
 
         return h1 ^ (h2 << 1);
     }
@@ -102,16 +61,19 @@ struct ConnectionTimeHash
 
 static bool dominates(const Ant& a, const Ant& b)
 {
-    if (b.path.size() == 0)
+    if (b.path.empty())
         return true;
 
     if (!a.isValid && !b.isValid)
         return false;
 
+    if (!b.isValid)
+        return true;
+
     if (!a.isValid || a.arrivalTime > b.arrivalTime || a.travelTime > b.travelTime || a.waitingTime > b.waitingTime || a.cost > b.cost || a.transfers > b.transfers)
         return false;
-    
-    if (!b.isValid || a.arrivalTime < b.arrivalTime || a.travelTime < b.travelTime || a.waitingTime < b.waitingTime || a.cost < b.cost || a.transfers < b.transfers)
+
+    if (a.arrivalTime < b.arrivalTime || a.travelTime < b.travelTime || a.waitingTime < b.waitingTime || a.cost < b.cost || a.transfers < b.transfers)
         return true;
 
     return false;
@@ -119,184 +81,9 @@ static bool dominates(const Ant& a, const Ant& b)
 
 static double calculateCost(const ConnectionTime& connection)
 {
-    return 0.0;
-
     auto duration = connection.to->getTime() - connection.from->getTime();
 
-    return duration.count() * 0.15;
-}
-
-static StopTime* chooseNextDeparture(const std::vector<StopTime*>& departureOptions, const Stop* end,
-    std::chrono::minutes arrival,
-    const std::unordered_map<ConnectionTime, double, ConnectionTimeHash>& pheromones)
-{
-    std::vector<double> weights;
-    double sum = 0.0;
-
-    for (auto* dep : departureOptions)
-    {
-        auto connection = ConnectionTime{ dep, dep->getNextStopTime() };
-        double pheromone = 1.0;
-        auto it = pheromones.find(connection);
-
-        if (it != pheromones.end())
-            pheromone = it->second;
-
-        double currentDist = geoDistance(dep->getStop(), end);
-        double nextDist = geoDistance(dep->getNextStopTime()->getStop(), end);
-        double dist = currentDist - nextDist;
-
-        double wait = (dep->getTime().count() - arrival.count()) * 1.0;
-
-        double noise = randomDouble(0.85, 1.15);
-        double heuristic = noise * (1.0 / (dist + 1.0)) * exp(-0.03 * wait);
-
-        double weight = pow(pheromone, ALPHA) * pow(heuristic, BETA);
-        weight = std::max(0.00001, weight);
-
-        weights.push_back(weight);
-        sum += weight;
-    }
-
-    double r = randomDouble(0.0, sum);
-    double acc = 0.0;
-
-    for (int i = 0; i < departureOptions.size(); i++)
-    {
-        acc += weights[i];
-
-        if (r <= acc)
-            return departureOptions[i];
-    }
-
-    return departureOptions.back();
-}
-
-static Ant buildAnt(const Network& network, const Stop* start, const Stop* end,
-    std::chrono::minutes departureTime,
-    const std::unordered_map<ConnectionTime, double, ConnectionTimeHash>& pheromones)
-{
-    Ant ant;
-    auto startOptions = network.getStopTimes(start, departureTime);
-
-    if (startOptions.empty())
-        return ant;
-
-    std::unordered_set<const Stop*> visited;
-
-    auto currentStopTime = chooseNextDeparture(startOptions, end, departureTime, pheromones);
-    auto nextStopTime = currentStopTime->getNextStopTime();
-
-    if (!currentStopTime || !nextStopTime)
-        return ant;
-
-    ant.path.push_back({ currentStopTime, nextStopTime });
-
-    while (ant.path.back().to->getStop() != end && ant.path.size() < MAX_PATH_LENGTH)
-    {
-        if (!currentStopTime || !nextStopTime)
-            break;
-
-        auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime(), nextStopTime->getTrip());
-
-        visited.insert(currentStopTime->getStop());
-        visited.insert(nextStopTime->getStop());
-
-        std::vector<StopTime*> filteredDepartureOptions;
-        for (auto& el : departureOptions)
-            if (visited.find(el->getNextStopTime()->getStop()) == visited.end())
-                filteredDepartureOptions.push_back(el);
-
-        //jesli brak opcji, to przerwij
-        if (filteredDepartureOptions.empty())
-            break;
-
-        //85% szans, że wybierzemy kontynuacje tej samej trasy
-        auto it = std::find_if(filteredDepartureOptions.begin(), filteredDepartureOptions.end(),
-            [&](const auto& elem)
-            {
-                return elem->getTrip() == currentStopTime->getTrip();
-            });
-
-        if (it != filteredDepartureOptions.end() && randomInt(0, 100) < 95)
-            currentStopTime = *it;
-        else
-            currentStopTime = chooseNextDeparture(filteredDepartureOptions, end, nextStopTime->getTime(), pheromones);
-
-        //weź następny przystanek z tej samej trasy
-        nextStopTime = currentStopTime->getNextStopTime();
-        ant.path.push_back(ConnectionTime{ currentStopTime, nextStopTime });
-    }
-
-    return ant;
-}
-
-static void evaluateAnt(Ant& ant, std::chrono::minutes departureTime, const Stop* end)
-{
-    if (ant.path.empty())
-    {
-        ant.isValid = false;
-        return;
-    }
-
-    ant.isValid = ant.path.back().to->getStop() == end;
-
-    if (!ant.isValid)
-    {
-        double minDistance = geoDistance(ant.path.front().from->getStop(), end);
-        for (const auto& el : ant.path)
-        {
-            auto dist = geoDistance(el.to->getStop(), end);
-            if (dist < minDistance)
-                minDistance = dist;
-        }
-        ant.distanceToGoal = minDistance;
-        ant.arrivalTime = std::chrono::minutes::max() / 2;
-        ant.travelTime = std::chrono::minutes::max() / 2;
-        ant.waitingTime = std::chrono::minutes::max() / 2;
-        ant.cost = 1e9;
-        ant.transfers = 1e9;
-        return;
-    }
-
-    auto startTime = ant.path.front().from->getTime();
-    auto endTime = ant.path.back().to->getTime();
-
-    ant.arrivalTime = endTime;
-    ant.travelTime = std::chrono::duration_cast<std::chrono::minutes>(endTime - startTime);
-    ant.waitingTime = std::chrono::minutes(0);
-    ant.transfers = 0;
-    ant.cost = 0.0;
-
-    Trip* previousTrip = nullptr;
-    auto arrival = departureTime;
-
-    for (const auto& connection : ant.path)
-    {
-        auto trip = connection.from->getTrip();
-
-        if (previousTrip && previousTrip != trip)
-        {
-            ant.transfers++;
-            ant.waitingTime += (connection.from->getTime() - arrival);
-        }
-
-        // TODO:
-        // dodaj wyliczanie kosztu
-        // np. strefy + linia pospieszna
-
-        previousTrip = trip;
-        arrival = connection.to->getTime();
-    }
-}
-
-static void evaporate(std::unordered_map<ConnectionTime, double, ConnectionTimeHash>& pheromones)
-{
-    for (auto& p : pheromones)
-    {
-        p.second *= (1.0 - EVAPORATION);
-        p.second = std::max(0.0001, p.second);
-    }
+    return 0.00;//duration.count() * 0.15;
 }
 
 static double pathSimilarity(const Ant& a, const Ant& b)
@@ -312,43 +99,256 @@ static double pathSimilarity(const Ant& a, const Ant& b)
     return sameEdges * 1.0 / std::max(a.path.size(), b.path.size());
 }
 
-static void trimArchive(std::vector<Ant>& archive)
+static double getPheromone(const std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones,
+    Objective objective,
+    const ConnectionTime& edge)
 {
-    while (archive.size() > MAX_PARETO_SIZE)
+    auto it = pheromones[objective].find(edge);
+
+    if (it == pheromones[objective].end())
+        return 1.0;
+
+    return it->second;
+}
+
+static double heuristicValue(Objective objective,
+    StopTime* dep,
+    const Stop* end,
+    std::chrono::minutes arrival,
+    StopTime* previous)
+{
+    double currentDist = geoDistance(dep->getStop(), end);
+    double nextDist = geoDistance(dep->getNextStopTime()->getStop(), end);
+    double wait = (dep->getTime() - arrival).count();
+    bool transfer = previous && previous->getTrip() != dep->getTrip();
+    double progress = currentDist - nextDist;
+
+    switch (objective)
     {
-        int removeIndex = -1;
+    case ARRIVAL:
+    case TRAVEL:
+        return exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_DURATION));
 
-        double worstSimilarity = -1.0;
+    case WAITING:
+        return exp(progress) * exp(-0.3 * (wait - MIN_TRANSFER_DURATION));
 
-        for (int i = 0; i < archive.size(); i++)
+    case COST:
+        return 1.0 / (calculateCost({ dep, dep->getNextStopTime() }) + 1.0);
+
+    case TRANSFERS:
+        return transfer ? 0.2 : 3.0;
+    }
+
+    return 1.0;
+}
+
+static StopTime* chooseNextDeparture(
+    const std::vector<StopTime*>& departureOptions,
+    const Stop* end,
+    std::chrono::minutes arrival,
+    StopTime* previous,
+    Objective objective,
+    const std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones)
+{
+    std::vector<double> weights;
+
+    double sum = 0.0;
+
+    for (auto* dep : departureOptions)
+    {
+        if (!dep || !dep->getNextStopTime())
+            continue;
+
+        auto edge = ConnectionTime{ dep, dep->getNextStopTime() };
+        double pheromone = getPheromone(pheromones, objective, edge);
+        double heuristic = heuristicValue(objective, dep, end, arrival, previous);
+
+        double weight = pow(pheromone, ALPHA) * pow(heuristic, BETA);
+
+        weight = std::max(0.00001, weight);
+        weights.push_back(weight);
+        sum += weight;
+    }
+
+    double r = randomDouble(0.0, sum);
+
+    double acc = 0.0;
+
+    for (int i = 0; i < departureOptions.size(); i++)
+    {
+        acc += weights[i];
+
+        if (r <= acc)
+            return departureOptions[i];
+    }
+
+    return departureOptions.back();
+}
+
+static Ant buildAnt(
+    const Network& network,
+    const Stop* start,
+    const Stop* end,
+    std::chrono::minutes departureTime,
+    Objective objective,
+    const std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones)
+{
+    Ant ant;
+
+    ant.objective = objective;
+
+    auto startOptions = network.getStopTimes(start,
+        departureTime,
+        nullptr,
+        0,
+        MAX_DEPARTURES_PER_ROUTE);
+
+    if (startOptions.empty())
+        return ant;
+
+    std::unordered_set<const Stop*> visited;
+
+    auto current = chooseNextDeparture(startOptions,
+        end,
+        departureTime,
+        nullptr,
+        objective,
+        pheromones);
+
+    if (!current || !current->getNextStopTime())
+        return ant;
+
+    auto next = current->getNextStopTime();
+
+    ant.path.push_back({ current, next });
+
+    while (next->getStop() != end && ant.path.size() < MAX_PATH_LENGTH)
+    {
+        visited.insert(current->getStop());
+
+        auto departures = network.getStopTimes(next->getStop(),
+            next->getTime(),
+            next->getTrip(),
+            MIN_TRANSFER_DURATION,
+            MAX_DEPARTURES_PER_ROUTE);
+
+        if (departures.empty())
+            break;
+
+        std::vector<StopTime*> filtered;
+
+        for (auto* dep : departures)
         {
-            double similaritySum = 0.0;
+            if (!dep || !dep->getNextStopTime())
+                continue;
 
-            for (int j = 0; j < archive.size(); j++)
-            {
-                if (i == j)
-                    continue;
+            if (visited.find(dep->getNextStopTime()->getStop()) != visited.end())
+                continue;
 
-                similaritySum += pathSimilarity(archive[i], archive[j]);
-            }
-
-            double avgSimilarity = similaritySum / (archive.size() - 1);
-
-            if (avgSimilarity > worstSimilarity)
-            {
-                worstSimilarity = avgSimilarity;
-                removeIndex = i;
-            }
+            filtered.push_back(dep);
         }
 
-        if (removeIndex >= 0)
-            archive.erase(archive.begin() + removeIndex);
+        if (filtered.empty())
+            filtered = departures;
+
+        auto it = std::find_if(filtered.begin(), filtered.end(),
+            [&](const auto& elem)
+            {
+                return elem->getTrip() == current->getTrip();
+            });
+
+        if (it != filtered.end() && randomDouble(0.0, 1.0) < SAME_TRIP_PROB)
+            current = *it;
         else
+            current = chooseNextDeparture(filtered, end, next->getTime(), current, objective, pheromones);
+
+        if (!current || !current->getNextStopTime())
             break;
+
+        next = current->getNextStopTime();
+
+        ant.path.push_back({ current, next });
+    }
+
+    return ant;
+}
+
+static void evaluateAnt(Ant& ant,
+    std::chrono::minutes departureTime,
+    const Stop* end)
+{
+    if (ant.path.empty())
+        return;
+
+    ant.isValid = ant.path.back().to->getStop() == end;
+
+    if (!ant.isValid)
+    {
+        double minDistance = geoDistance(ant.path.front().from->getStop(), end);
+
+        for (const auto& edge : ant.path)
+        {
+            minDistance = std::min(minDistance,
+                geoDistance(edge.to->getStop(), end));
+        }
+
+        ant.distanceToGoal = minDistance;
+
+        return;
+    }
+
+    auto startTime = ant.path.front().from->getTime();
+    auto endTime = ant.path.back().to->getTime();
+
+    ant.arrivalTime = endTime;
+    ant.travelTime = endTime - startTime;
+    ant.waitingTime = std::chrono::minutes(0);
+
+    ant.transfers = 0;
+    ant.cost = 0.0;
+
+    Trip* previousTrip = nullptr;
+
+    auto arrival = departureTime;
+
+    for (const auto& edge : ant.path)
+    {
+        auto* trip = edge.from->getTrip();
+
+        if (previousTrip && previousTrip != trip)
+        {
+            ant.transfers++;
+
+            auto wait = edge.from->getTime() - arrival;
+
+            if (wait.count() > 0)
+                ant.waitingTime += wait;
+        }
+
+        ant.cost += calculateCost(edge);
+
+        previousTrip = trip;
+
+        arrival = edge.to->getTime();
     }
 }
 
-static void updateParetoArchive(std::vector<Ant>& archive, const Ant& candidate)
+static void evaporate(
+    std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones)
+{
+    for (int obj = 0; obj < 5; obj++)
+    {
+        for (auto& p : pheromones[obj])
+        {
+            p.second *= (1.0 - EVAPORATION);
+
+            p.second = std::max(0.0001, p.second);
+        }
+    }
+}
+
+static void updateParetoArchive(std::vector<Ant>& archive,
+    const Ant& candidate)
 {
     if (candidate.path.empty())
         return;
@@ -369,48 +369,82 @@ static void updateParetoArchive(std::vector<Ant>& archive, const Ant& candidate)
 
     for (const auto& ant : archive)
     {
-        double similarity = pathSimilarity(candidate, ant);
-
-        if (similarity > 0.90)
-        {
-            bool better =
-                candidate.arrivalTime < ant.arrivalTime ||
-                candidate.travelTime < ant.travelTime ||
-                candidate.waitingTime < ant.waitingTime ||
-                candidate.cost < ant.cost ||
-                candidate.transfers < ant.transfers;
-
-            if (!better)
-                return;
-        }
+        if (pathSimilarity(candidate, ant) > 0.90)
+            return;
     }
 
     archive.push_back(candidate);
 
-    trimArchive(archive);
+    if (archive.size() > MAX_ARCHIVE_SIZE)
+    {
+        archive.erase(archive.begin() + randomInt(0, archive.size() - 1));
+    }
 }
 
-static void reinforce(const std::vector<Ant>& archive,
-    std::unordered_map<ConnectionTime, double, ConnectionTimeHash>& pheromones)
+static void reinforce(
+    const std::vector<Ant>& archive,
+    std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones,
+    std::chrono::minutes departureReference)
 {
     for (const auto& ant : archive)
     {
         double reward = 1.0;
 
         if (!ant.isValid)
-            reward += 100.0 / (ant.distanceToGoal + 1.0);
+        {
+            reward += 1.0 / (ant.distanceToGoal + 0.1);
+        }
         else
         {
-            reward += 1000.0 / (ant.arrivalTime.count() + 1.0);
-            reward += 1000.0 / (ant.travelTime.count() + 1.0);
-            reward += 1000.0 / (ant.waitingTime.count() + 1.0);
-            reward += 1000.0 / (ant.cost + 1.0);
-            reward += 1000.0 / (ant.transfers + 1.0);
+            switch (ant.objective)
+            {
+            case ARRIVAL:
+            {
+                double arrival =
+                    (ant.arrivalTime - departureReference).count();
+
+                reward += 10000.0 / (arrival + 1.0);
+
+                break;
+            }
+
+            case TRAVEL:
+            {
+                reward += 10000.0 /
+                    (ant.travelTime.count() + 1.0);
+
+                break;
+            }
+
+            case WAITING:
+            {
+                reward += 10000.0 /
+                    (ant.waitingTime.count() + 1.0);
+
+                break;
+            }
+
+            case COST:
+            {
+                reward += 10000.0 /
+                    (ant.cost + 1.0);
+
+                break;
+            }
+
+            case TRANSFERS:
+            {
+                reward += 10000.0 /
+                    (ant.transfers + 1.0);
+
+                break;
+            }
+            }
         }
 
-        for (const auto& gene : ant.path)
+        for (const auto& edge : ant.path)
         {
-            pheromones[gene] += 0.0001 * reward;
+            pheromones[ant.objective][edge] += reward * 0.01;
         }
     }
 }
@@ -418,9 +452,6 @@ static void reinforce(const std::vector<Ant>& archive,
 static std::vector<Ant> selectBestRoutes(const std::vector<Ant>& archive)
 {
     std::vector<Ant> result;
-
-    if (archive.empty())
-        return result;
 
     const Ant* bestArrival = nullptr;
     const Ant* bestTravel = nullptr;
@@ -456,7 +487,7 @@ static std::vector<Ant> selectBestRoutes(const std::vector<Ant>& archive)
 
             for (const auto& existing : result)
             {
-                if (pathSimilarity(existing, *ant) > 0.9)
+                if (pathSimilarity(existing, *ant) > 0.90)
                     return;
             }
 
@@ -472,19 +503,25 @@ static std::vector<Ant> selectBestRoutes(const std::vector<Ant>& archive)
     return result;
 }
 
-std::vector<Path> ACOAlgorithm::findPath(const Network& network, const Stop* start,
-    const Stop* end, std::chrono::minutes departureTime)
+std::vector<Path> ACOAlgorithm::findPath(
+    const Network& network,
+    const Stop* start,
+    const Stop* end,
+    std::chrono::minutes departureTime)
 {
-    auto startOptions = network.getStopTimes(start, departureTime);
-
-    if (startOptions.empty())
-        return { Path("No departures from starting stop!") };
     if (start == end)
         return { Path("Starting stop equals destination!") };
 
-    std::unordered_map<ConnectionTime, double, ConnectionTimeHash> pheromones;
+    auto startOptions =
+        network.getStopTimes(start, departureTime, nullptr, 0, MAX_DEPARTURES_PER_ROUTE);
 
-    std::vector<Ant> paretoArchive;
+    if (startOptions.empty())
+        return { Path("No departures from starting stop!") };
+
+    std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5> pheromones;
+
+    std::vector<Ant> archive;
+    std::vector<Ant> bestRoutes;
 
     for (int iteration = 0; iteration < ITERATIONS; iteration++)
     {
@@ -492,31 +529,34 @@ std::vector<Path> ACOAlgorithm::findPath(const Network& network, const Stop* sta
 
         for (int i = 0; i < ANT_COUNT; i++)
         {
-            auto ant = buildAnt(network, start, end, departureTime, pheromones);
+            Objective objective = (Objective)randomInt(0, 3);
 
+            auto ant = buildAnt(network, start, end, departureTime, objective, pheromones);
             evaluateAnt(ant, departureTime, end);
-
             ants.push_back(ant);
         }
+
+        if (iteration == 50)
+            int x = 9;
 
         evaporate(pheromones);
 
         for (const auto& ant : ants)
         {
-            updateParetoArchive(paretoArchive, ant);
+            updateParetoArchive(archive, ant);
         }
 
-        reinforce(paretoArchive, pheromones);
+        bestRoutes = selectBestRoutes(archive);
+        reinforce(bestRoutes, pheromones, departureTime);
     }
 
     std::vector<Path> results;
-
-    auto bestRoutes = selectBestRoutes(paretoArchive);
 
     for (const auto& ant : bestRoutes)
     {
         if (!ant.isValid)
             continue;
+
         results.push_back(Path(
             ant.path,
             ant.arrivalTime,
@@ -526,10 +566,13 @@ std::vector<Path> ACOAlgorithm::findPath(const Network& network, const Stop* sta
             ant.transfers));
     }
 
-    std::sort(results.begin(), results.end(), [](const Path& p1, const Path& p2) {
-        if (p1.getArrivalTime() == p2.getArrivalTime())
-            return p1.getTransfers() < p2.getTransfers();
-        return p1.getArrivalTime() < p2.getArrivalTime();
+    std::sort(results.begin(), results.end(),
+        [](const Path& a, const Path& b)
+        {
+            if (a.getArrivalTime() == b.getArrivalTime())
+                return a.getTransfers() < b.getTransfers();
+
+            return a.getArrivalTime() < b.getArrivalTime();
         });
 
     if (results.empty())
