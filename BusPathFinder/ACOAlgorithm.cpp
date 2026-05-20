@@ -8,8 +8,8 @@
 #include "ACOAlgorithm.h"
 #include "Functions.h"
 
-#define ANT_COUNT 100
-#define ITERATIONS 100
+#define ANT_COUNT 80
+#define ITERATIONS 80
 #define MAX_PATH_LENGTH 50
 #define MAX_ARCHIVE_SIZE 100
 
@@ -86,17 +86,44 @@ static double calculateCost(const ConnectionTime& connection)
     return 0.00;//duration.count() * 0.15;
 }
 
-static double pathSimilarity(const Ant& a, const Ant& b)
+static std::vector<Trip*> buildTripSequence(const Ant& ant)
 {
-    int sameEdges = 0;
+    std::vector<Trip*> trips;
 
-    for (const auto& edge : a.path)
+    Trip* previous = nullptr;
+
+    for (const auto& edge : ant.path)
     {
-        if (std::find(b.path.begin(), b.path.end(), edge) != b.path.end())
-            sameEdges++;
+        auto* trip = edge.from->getTrip();
+
+        if (trip != previous)
+        {
+            trips.push_back(trip);
+            previous = trip;
+        }
     }
 
-    return sameEdges * 1.0 / std::max(a.path.size(), b.path.size());
+    return trips;
+}
+
+static double pathSimilarity(const Ant& a, const Ant& b)
+{
+    auto tripsA = buildTripSequence(a);
+    auto tripsB = buildTripSequence(b);
+
+    if (tripsA.empty() || tripsB.empty())
+        return 0.0;
+
+    int common = 0;
+
+    for (auto* tripA : tripsA)
+    {
+        if (std::find(tripsB.begin(), tripsB.end(), tripA) != tripsB.end())
+            common++;
+    }
+
+    return common * 1.0 /
+        std::max(tripsA.size(), tripsB.size());
 }
 
 static double getPheromone(const std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones,
@@ -150,6 +177,14 @@ static StopTime* chooseNextDeparture(
     Objective objective,
     const std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones)
 {
+
+    double epsilon = 0.1;
+
+    if (randomDouble(0.0, 1.0) < epsilon)
+    {
+        return departureOptions[randomInt(0, departureOptions.size() - 1)];
+    }
+
     std::vector<double> weights;
 
     double sum = 0.0;
@@ -157,7 +192,10 @@ static StopTime* chooseNextDeparture(
     for (auto* dep : departureOptions)
     {
         if (!dep || !dep->getNextStopTime())
+        {
+            weights.push_back(0.0);
             continue;
+        }
 
         auto edge = ConnectionTime{ dep, dep->getNextStopTime() };
         double pheromone = getPheromone(pheromones, objective, edge);
@@ -444,7 +482,9 @@ static void reinforce(
 
         for (const auto& edge : ant.path)
         {
-            pheromones[ant.objective][edge] += reward * 0.01;
+            auto& tau = pheromones[ant.objective][edge];
+            tau += reward * 0.01;
+            tau = std::clamp(tau, 0.001, 100.0);
         }
     }
 }
