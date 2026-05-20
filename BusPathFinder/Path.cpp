@@ -61,3 +61,18 @@ Path::Path(std::vector<ConnectionTime> v, std::chrono::minutes a, std::chrono::m
 		nodes[nodeIndex].arrivalTime = v.back().to->getTime();
 	}
 }
+
+bool Path::operator==(const Path& other) const
+{
+	bool val = arrivalTime == other.arrivalTime && travelTime == other.travelTime && waitingTime == other.waitingTime && cost == other.cost && transfers == other.transfers;
+
+	if (!val || nodes.size() != other.nodes.size())
+		return false;
+
+	for (int i = 0; i < nodes.size(); i++)
+	{
+		if (nodes[i].service != other.nodes[i].service)
+			return false;
+	}
+	return true;
+}

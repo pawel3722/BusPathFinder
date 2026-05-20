@@ -2,6 +2,7 @@
 #include "Functions.h"
 
 #include <fstream>
+#include <regex>
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -74,12 +75,21 @@ Network NetworkLoader::load(
             std::string line = tripJson["line"];
             std::string direction = tripJson["direction"];
             std::string routeId = tripJson["shape_id"];
+            std::string jobId = "";
+
+            std::regex r(R"(_([^_]+)$)");
+            std::smatch match;
+            if (std::regex_search(id, match, r)) {
+                jobId = match[1];
+            }
+
 
             trips[id] = std::make_unique<Trip>(
                 id,
                 line,
                 direction,
-                routeId
+                routeId,
+                jobId
             );
         }
     }

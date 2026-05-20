@@ -34,4 +34,6 @@ public:
 
 	const std::vector<PathNode>& getNodes() const { return nodes; }
 	friend std::ostream& operator<<(std::ostream& os, const Path& path);
+
+	bool operator==(const Path& other) const;
 };

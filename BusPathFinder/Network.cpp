@@ -26,7 +26,7 @@ std::vector<StopTime*> Network::getStopTimes(const Stop* stop, std::chrono::minu
                 if (!dep || !dep->getNextStopTime() || dep->getTime() < minTime)
                     continue;
 
-                bool isTransfer = trip && dep->getTrip() != trip;
+                bool isTransfer = trip && dep->getTrip()->getJobId() != trip->getJobId();
 
                 auto requiredTime = isTransfer
                     ? minTime + std::chrono::minutes(minTransferDuration)
@@ -54,4 +54,43 @@ const StopTime* Network::getLaterDeparture(const StopTime* stopTime) const
             break;
     }
     return it != st.end() ? *it : nullptr;
+}
+
+const StopTime* Network::getEarlierDeparture(const StopTime* stopTime) const
+{
+    auto& st = stopTimesIndex.at(stopTime->getStop()).at(stopTime->getTrip()->getRouteId());
+    auto it = std::find(st.rbegin(), st.rend(), stopTime);
+    for (; it != st.rend(); ++it)
+    {
+        if ((*it)->getTrip() != stopTime->getTrip())
+            break;
+    }
+    return it != st.rend() ? *it : nullptr;
+}
+
+const StopTime* Network::getCommonStop(Trip* t1, Trip* t2, const StopTime* start, const StopTime* end) const
+{
+    auto& st1 = t1->getStopTimes();
+    auto& st2 = t2->getStopTimes();
+
+    const StopTime* stop = nullptr;
+
+    for (auto it = std::find(st1.begin(), st1.end(), start); it != st1.end(); it++)
+    {
+        for (const auto& el : st2)
+        {
+            if ((*it)->getStop() == el->getStop())
+                stop = el;
+            if (el == end)
+                break;
+        }
+    }
+
+
+    for (const auto& el1 : st1)
+        for (const auto& el2 : st2)
+            if (el1->getStop() == el2->getStop())
+                stop = el2;
+
+    return stop;
 }

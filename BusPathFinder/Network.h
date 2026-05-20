@@ -55,4 +55,7 @@ public:
 
     std::vector<StopTime*> getStopTimes(const Stop* stop, std::chrono::minutes minTime, const Trip* trip = nullptr, int minTransferDuration = 0, int maxDeparturesPerRoute = 0) const;
     const StopTime* getLaterDeparture(const StopTime* stopTime) const;
+    const StopTime* getEarlierDeparture(const StopTime* stopTime) const;
+
+    const StopTime* getCommonStop(Trip* t1, Trip* t2, const StopTime* start, const StopTime* end) const;
 };

@@ -43,7 +43,7 @@ int main()
             end = network.getRandomStop();
             departureTime = randomTime();
 
-            std::cout << "FROM: " << start->getName() << " TO: " << end->getName() << " AT: " << formatTime(departureTime) << std::endl;
+            std::cout << "FROM: " << start->getName() << " <" << start->getId() << "> TO: " << end->getName() << " <" << end->getId() << "> AT: " << formatTime(departureTime) << std::endl;
         }
         else
         {
@@ -59,13 +59,13 @@ int main()
             if (!start)
             {
                 std::cout << "Invalid start stop ID\n";
-                return 1;
+                continue;
             }
 
             if (!end)
             {
                 std::cout << "Invalid end stop ID\n";
-                return 1;
+                continue;
             }
 
 
@@ -91,7 +91,7 @@ int main()
                 return res;
             });
 
-        auto futureAco = std::async(std::launch::async, [&]()
+        /*auto futureAco = std::async(std::launch::async, [&]()
             {
                 auto res = acoAlgRouteFinder.findRoute(
                     start,
@@ -99,7 +99,7 @@ int main()
                     departureTime);
                 std::cout << "ACO ready! " << std::endl;
                 return res;
-            });
+            });*/
 
         // bariera — czekamy na oba wyniki
         try
@@ -111,14 +111,14 @@ int main()
             std::cout << "GEN exception: " << ex.what() << std::endl;
         }
 
-        try
+        /*try
         {
             pathsAco = futureAco.get();
         }
         catch (const std::exception& ex)
         {
             std::cout << "ACO exception: " << ex.what() << std::endl;
-        }
+        }*/
 
         std::cout << "++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++" << std::endl;
 

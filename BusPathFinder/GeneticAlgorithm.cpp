@@ -498,37 +498,148 @@ Individual crossover(
     return child;
 }
 
-static bool delayStart(Individual& individual,
+static bool fixWaitingTimes(Individual& individual,
     const Network& network)
 {
-    int index = 0;
-    const StopTime* transferPointArr = nullptr;
-    const StopTime* transferPointDep = nullptr;
+    
+    std::vector<const StopTime*> transferPointArrs;
+    std::vector<const StopTime*> transferPointDeps;
+    std::vector<int> indices;
     Trip* currentTrip = nullptr;
 
-    for (; index < individual.genes.size(); index++)
+    for (int i = 0; i < individual.genes.size(); i++)
     {
-        if (currentTrip && currentTrip != individual.genes[index].from->getTrip())
+        if (currentTrip && currentTrip != individual.genes[i].from->getTrip())
         {
-            transferPointArr = individual.genes[index - 1].to;
-            transferPointDep = individual.genes[index].from;
-            break;
+            transferPointArrs.push_back(individual.genes[i - 1].to);
+            transferPointDeps.push_back(individual.genes[i].from);
+            indices.push_back(i);
         }
-        currentTrip = individual.genes[index].from->getTrip();
+        currentTrip = individual.genes[i].from->getTrip();
     }
-    if (transferPointArr && transferPointDep)
+
+    for (int i = static_cast<int>(transferPointDeps.size()) - 1; i >= 0; i--)
     {
-        auto laterArr = network.getLaterDeparture(transferPointArr);
-        if (laterArr && laterArr->getTime() < transferPointDep->getTime())
+        auto ed = network.getEarlierDeparture(transferPointDeps[i]);
+        if (ed == nullptr || transferPointArrs[i]->getTime().count() + MIN_TRANSFER_DURATION > ed->getTime().count())
+            continue;
+        int maxIndex = i == transferPointDeps.size() - 1 ? individual.genes.size() : indices[i + 1];
+        int minIndex = indices[i];
+
+        //TODO
+        for (int j = minIndex; j < maxIndex; j++)
         {
-            for (int i = 0; i < index; i++)
-            {
-                auto dep = network.getLaterDeparture(individual.genes[i].from);
-                auto arr = network.getLaterDeparture(individual.genes[i].to);
-                individual.genes[i] = ConnectionTime{ dep,arr };
-            }
+            auto from = individual.genes[j].from;
+            auto to = individual.genes[j].to;
+            individual.genes[j] = { network.getEarlierDeparture(from), network.getEarlierDeparture(to) };
         }
+
+        for (int k = 1; k < individual.genes.size(); k++)
+        {
+            if (individual.genes[k - 1].to->getTime() > individual.genes[k].from->getTime() || individual.genes[k - 1].to->getStop() != individual.genes[k].from->getStop())
+                int x = 9;
+        }
+
+
         return true;
+    }
+
+    for (int i = 0; i < transferPointDeps.size(); i++)
+    {
+        auto la = network.getLaterDeparture(transferPointArrs[i]);
+        if (la == nullptr || la->getTime().count() + MIN_TRANSFER_DURATION > transferPointDeps[i]->getTime().count())
+            continue;
+        int minIndex = i ? indices[i - 1] : 0;
+        int maxIndex = indices[i];
+
+        //TODO
+        for (int j = minIndex; j < maxIndex; j++)
+        {
+            auto from = individual.genes[j].from;
+            auto to = individual.genes[j].to;
+            individual.genes[j] = { network.getLaterDeparture(from), network.getLaterDeparture(to) };
+        }
+
+        for (int k = 1; k < individual.genes.size(); k++)
+        {
+            if (individual.genes[k - 1].to->getTime() > individual.genes[k].from->getTime() || individual.genes[k - 1].to->getStop() != individual.genes[k].from->getStop())
+                int x = 9;
+        }
+
+        return true;
+    }
+    return false;
+}
+
+static bool skipConnection(Individual& individual, const Network& network)
+{
+    Trip* currentTrip = nullptr;
+    std::vector<const StopTime*> tripEntryPoints;
+
+    for (const auto& el : individual.genes)
+    {
+        if (el.from->getTrip() != currentTrip)
+        {
+            tripEntryPoints.push_back(el.from);
+            currentTrip = el.from->getTrip();
+        }
+    }
+
+    for (int i = 0; i < tripEntryPoints.size(); i++)
+    {
+        for (int j = tripEntryPoints.size() - 1; j >= i + 2; j--)
+        {
+            auto commonStop = network.getCommonStop(tripEntryPoints[i]->getTrip(), tripEntryPoints[j]->getTrip(),tripEntryPoints[i], tripEntryPoints[j]);
+            if (commonStop == nullptr)
+                continue;
+
+            auto trip1 = tripEntryPoints[i]->getTrip();
+            auto& st1 = trip1->getStopTimes();
+            int index1 = tripEntryPoints[i]->getIndexInRoute();
+
+            auto trip2 = tripEntryPoints[j]->getTrip();
+            auto& st2 = trip2->getStopTimes();
+            int index2 = commonStop->getIndexInRoute();
+
+            if (tripEntryPoints[j]->getIndexInRoute() < commonStop->getIndexInRoute())
+                continue;
+
+            std::vector<ConnectionTime> newGenes;
+
+            for (const auto& el : individual.genes)
+            {
+                if (el.from == tripEntryPoints[i])
+                    break;
+                newGenes.push_back(el);
+            }
+
+            while (index1 + 1 < st1.size() && st1[index1]->getStop() != commonStop->getStop())
+            {
+                newGenes.push_back({ st1[index1], st1[ ++index1] });
+            }
+
+            if (st1[index1]->getTime().count() + MIN_TRANSFER_DURATION > st2[index2]->getTime().count())
+                continue;
+
+            while (index2 + 1 < st2.size() && st2[index2]->getStop() != tripEntryPoints[j]->getStop())
+            {
+                newGenes.push_back({ st2[index2], st2[++index2] });
+            }
+
+            for (auto it = std::find_if(individual.genes.begin(), individual.genes.end(), [&](const ConnectionTime& ct) {return ct.from == tripEntryPoints[j];}); it != individual.genes.end(); it++)
+            {
+                newGenes.push_back(*it);
+            }
+
+            for (int k = 1; k < newGenes.size(); k++)
+            {
+                if (newGenes[k - 1].to->getTime() > newGenes[k].from->getTime() || newGenes[k - 1].to->getStop() != newGenes[k].from->getStop())
+                    int x = 9;
+            }
+
+            individual.genes = newGenes;
+            return true;
+        }
     }
     return false;
 }
@@ -562,6 +673,9 @@ static void mutate(
 
         auto current = chooseNextDeparture(departures, end, individual.genes.back().to->getTime());
         auto next = current->getNextStopTime();
+
+        if (!individual.genes.empty() && current->getTime() < individual.genes.back().to->getTime())
+            int x = 9;
 
         individual.genes.push_back(
             ConnectionTime{ current, next });
@@ -631,6 +745,9 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         //wylosuj rozpoczecie podrozy
         auto currentStopTime = chooseNextDeparture(startOptions, end, departureTime);
         auto nextStopTime = currentStopTime->getNextStopTime();
+        if (!individual.genes.empty() && currentStopTime->getTime() < individual.genes.back().to->getTime())
+            int x = 9;
+
         individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
 
         while (individual.genes.back().to->getStop() != end && individual.genes.size() < MAX_PATH_LENGTH)
@@ -667,6 +784,12 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
             //weź następny przystanek z tej samej trasy
             nextStopTime = currentStopTime->getNextStopTime();
+            
+            
+            if (!individual.genes.empty() && currentStopTime->getTime() < individual.genes.back().to->getTime())
+                int x = 9;
+
+
             individual.genes.push_back(ConnectionTime{ currentStopTime, nextStopTime });
         }
 
@@ -675,16 +798,21 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
     for (int generation = 0; generation < GENERATIONS; generation++)
     {
+
+
+
+
+
         // ocena
         for (auto& individual : population)
         {
             evaluateIndividual(individual, departureTime, end);
             //sprobuj opoznic rozpoczecie podrozy
-            if (individual.transfers > 0 && individual.isValid)
+            /*if (individual.transfers > 0 && individual.isValid)
             {
                 if(delayStart(individual, network));
                     evaluateIndividual(individual, departureTime, end);
-            }
+            }*/
         }
 
         // sortowanie Pareto
@@ -705,8 +833,22 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
             auto child = crossover(parent1, parent2, end);
 
-            if (randomDouble(0.0, 1.0) < 0.1)
+            if (randomDouble(0.0, 1.0) < 0.2)
                 mutate(child, network, end);
+
+            evaluateIndividual(child, departureTime, end);
+
+            if (child.isValid && child.transfers > 0 && randomDouble(0.0, 1.0) < 0.5)
+            {
+                fixWaitingTimes(child, network);
+                evaluateIndividual(child, departureTime, end);
+            }
+
+            if (child.isValid && child.transfers >= 2 && randomDouble(0.0, 1.0) < 0.3)
+            {
+                skipConnection(child, network);
+                evaluateIndividual(child, departureTime, end);
+            }
 
             evaluateIndividual(child, departureTime, end);
 
@@ -800,7 +942,7 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
             el.transfers));
     }
 
-    std::sort(results.begin(), results.end(), [](const Path& p1, const Path& p2) {
+    std::sort(results.begin(), results.end(), [&](const Path& p1, const Path& p2) {
         if (p1.getArrivalTime() == p2.getArrivalTime())
             return p1.getTransfers() < p2.getTransfers();
         return p1.getArrivalTime() < p2.getArrivalTime();
@@ -808,6 +950,10 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
     if (results.empty())
         results.push_back(Path("Journey from start to end was not found!"));
+    else
+    {
+        results.erase(std::unique(results.begin(), results.end()), results.end());
+    }
 
     return results;
 }
