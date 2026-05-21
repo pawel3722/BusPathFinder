@@ -6,7 +6,7 @@
 #include "PSOAlgorithm.h"
 #include "Functions.h"
 
-#define SWARM_SIZE 60
+#define SWARM_SIZE 80
 #define ITERATIONS 80
 #define MAX_PATH_LENGTH 40
 #define MAX_ARCHIVE_SIZE 100
@@ -16,8 +16,8 @@
 #define GBEST_PROB 0.45
 
 #define MIN_TRANSFER_DURATION 3
-#define MAX_DEPARTURES_PER_ROUTE 5
-#define SAME_TRIP_PROB 0.85
+#define MAX_DEPARTURES_PER_ROUTE 3
+#define SAME_TRIP_PROB 0.95
 
 enum Objective
 {
@@ -117,15 +117,16 @@ static double heuristicValue(Objective objective,
     double wait = (dep->getTime() - arrival).count();
     bool transfer = previous && previous->getTrip() != dep->getTrip();
     double progress = currentDist - nextDist;
+    double transferPenalty = transfer ? 0.7 : 1.0;
 
     switch (objective)
     {
     case ARRIVAL:
     case TRAVEL:
-        return exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_DURATION));
+        return exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_DURATION)) * transferPenalty;
 
     case WAITING:
-        return exp(progress) * exp(-0.3 * (wait - MIN_TRANSFER_DURATION));
+        return exp(progress) * exp(-0.3 * (wait - MIN_TRANSFER_DURATION)) * transferPenalty;
 
     case COST:
         return 1.0 / (calculateCost({ dep, dep->getNextStopTime() }) + 1.0);
@@ -137,12 +138,20 @@ static double heuristicValue(Objective objective,
     return 1.0;
 }
 
+static bool containsEdge(const std::vector<ConnectionTime>& path,
+    const ConnectionTime& edge)
+{
+    return std::find(path.begin(), path.end(), edge) != path.end();
+}
+
 static StopTime* chooseNextDeparture(
     const std::vector<StopTime*>& departureOptions,
     const Stop* end,
     std::chrono::minutes arrival,
     StopTime* previous,
-    Objective objective)
+    Objective objective,
+    const std::vector<ConnectionTime>* pbest = nullptr,
+    const std::vector<ConnectionTime>* gbest = nullptr)
 {
 
     double epsilon = 0.1;
@@ -165,11 +174,17 @@ static StopTime* chooseNextDeparture(
         }
 
         auto edge = ConnectionTime{ dep, dep->getNextStopTime() };
-        double heuristic = heuristicValue(objective, dep, end, arrival, previous);
+        double weight = heuristicValue(objective, dep, end, arrival, previous);
 
-        heuristic = std::max(0.00001, heuristic);
-        weights.push_back(heuristic);
-        sum += heuristic;
+        if (pbest && containsEdge(*pbest, edge))
+            weight *= 1.5;
+
+        if (gbest && containsEdge(*gbest, edge))
+            weight *= 2.0;
+
+        weight = std::max(0.00001, weight);
+        weights.push_back(weight);
+        sum += weight;
     }
 
     double r = randomDouble(0.0, sum);
@@ -385,10 +400,10 @@ static const Particle& selectLeader(const std::vector<Particle>& archive, Object
 
     int eliteCount = std::max(1, (int)(candidates.size() * 0.3));
 
-    return *candidates[randomInt(0, eliteCount - 1)];
+    return *candidates.front();
 }
 
-static void rerouteFromIndex(Particle& particle, const Network& network, const Stop* end, int splitIndex)
+static void rerouteFromIndex(Particle& particle, const Particle& leader, const Network& network, const Stop* end, int splitIndex)
 {
     if (particle.path.empty())
         return;
@@ -444,8 +459,9 @@ static void rerouteFromIndex(Particle& particle, const Network& network, const S
         if (sameTripIt != filtered.end() && randomDouble(0.0, 1.0) < SAME_TRIP_PROB)
             current = *sameTripIt;
         else
-            current = chooseNextDeparture(filtered, end, current->getTime(), ptr, particle.objective);
-        
+            current = chooseNextDeparture(filtered, end, current->getTime(), 
+                ptr, particle.objective, &particle.personalBest, &leader.path);
+            
         if (!current || !current->getNextStopTime())
             break;
         
@@ -458,7 +474,7 @@ static void rerouteFromIndex(Particle& particle, const Network& network, const S
     }
 }
 
-static void followPath(Particle& particle, const std::vector<ConnectionTime>& target, const Network& network, const Stop* end)
+static void followPath(Particle& particle, const Particle&leader, const std::vector<ConnectionTime>& target, const Network& network, const Stop* end)
 {
     if (particle.path.empty() || target.empty())
         return;
@@ -481,7 +497,7 @@ static void followPath(Particle& particle, const std::vector<ConnectionTime>& ta
 
     if(currentIndex == -1 && particle.path.front().from->getStop() != targetStop->getStop())
     {
-        rerouteFromIndex(particle, network, end, randomInt(0, particle.path.size() - 1));
+        rerouteFromIndex(particle, leader, network, end, randomInt(0, particle.path.size() - 1));
         return;
     }
 
@@ -526,22 +542,21 @@ std::vector<Path> PSOAlgorithm::findPath(const Network& network, const Stop* sta
 
         for (auto& particle : swarm)
         {
+            const auto& leader = selectLeader(archive, particle.objective);
             double r = randomDouble(0.0, 1.0);
 
             if (r < PBEST_PROB && !particle.personalBest.empty())
             {
-                followPath(particle, particle.personalBest, network, end);
+                followPath(particle, leader, particle.personalBest, network, end);
             }
             else if (r < PBEST_PROB + GBEST_PROB)
             {
-                const auto& leader = selectLeader(archive, particle.objective);
-
-                followPath(particle, leader.path, network, end);
+                followPath(particle, leader, leader.path, network, end);
             }
 
             if (randomDouble(0.0, 1.0) < MUTATION_PROB)
             {
-                rerouteFromIndex(particle, network, end, randomInt(0, particle.path.size() - 1));
+                rerouteFromIndex(particle, leader, network, end, randomInt(0, particle.path.size() - 1));
             }
 
             evaluateParticle(particle, departureTime, end);
