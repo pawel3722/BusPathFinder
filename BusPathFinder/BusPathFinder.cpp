@@ -7,6 +7,7 @@
 #include "RouteFinder.h"
 #include "Functions.h" 
 #include "ACOAlgorithm.h"
+#include "PSOAlgorithm.h"
 
 int main()
 {
@@ -21,8 +22,10 @@ int main()
 
     GeneticAlgorithm genAlg;
     ACOAlgorithm acoAlg;
+    PSOAlgorithm psoAlg;
     RouteFinder genAlgRouteFinder(network, genAlg);
     RouteFinder acoAlgRouteFinder(network, acoAlg);
+    RouteFinder psoAlgRouteFinder(network, psoAlg);
 
     int startId = 0;
     int endId = 0;
@@ -82,6 +85,7 @@ int main()
 
         std::vector<Path> pathsGen;
         std::vector<Path> pathsAco;
+        std::vector<Path> pathsPso;
 
         auto futureGen = std::async(std::launch::async, [&]()
             {
@@ -100,6 +104,15 @@ int main()
                     end,
                     departureTime);
                 std::cout << "ACO ready! " << std::endl;
+                return res;
+            });
+        auto futurePso = std::async(std::launch::async, [&]()
+            {
+                auto res = psoAlgRouteFinder.findRoute(
+                    start,
+                    end,
+                    departureTime);
+                std::cout << "PSO ready! " << std::endl;
                 return res;
             });
 
@@ -122,6 +135,15 @@ int main()
             std::cout << "ACO exception: " << ex.what() << std::endl;
         }
 
+        try
+        {
+            pathsPso = futurePso.get();
+        }
+        catch (const std::exception& ex)
+        {
+            std::cout << "PSO exception: " << ex.what() << std::endl;
+        }
+
         std::cout << "++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++" << std::endl;
 
         for (const auto& path : pathsGen)
@@ -132,6 +154,13 @@ int main()
         std::cout << "++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++" << std::endl;
 
         for (const auto& path : pathsAco)
+        {
+            std::cout << path << std::endl;
+        }
+
+        std::cout << "++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++" << std::endl;
+
+        for (const auto& path : pathsPso)
         {
             std::cout << path << std::endl;
         }

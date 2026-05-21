@@ -64,11 +64,8 @@ static bool dominates(const Ant& a, const Ant& b)
     if (b.path.empty())
         return true;
 
-    if (!a.isValid && !b.isValid)
-        return false;
-
     if (!b.isValid)
-        return true;
+        return a.isValid;
 
     if (!a.isValid || a.arrivalTime > b.arrivalTime || a.travelTime > b.travelTime || a.waitingTime > b.waitingTime || a.cost > b.cost || a.transfers > b.transfers)
         return false;
@@ -228,35 +225,25 @@ static Ant buildAnt(
     const Stop* start,
     const Stop* end,
     std::chrono::minutes departureTime,
-    Objective objective,
     const std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones)
 {
     Ant ant;
 
+    auto objective = (Objective)randomInt(0, 3);
     ant.objective = objective;
 
-    auto startOptions = network.getStopTimes(start,
-        departureTime,
-        nullptr,
-        0,
-        MAX_DEPARTURES_PER_ROUTE);
+    auto startOptions = network.getStopTimes(start, departureTime, nullptr, 0, MAX_DEPARTURES_PER_ROUTE);
 
     if (startOptions.empty())
         return ant;
 
-    std::unordered_set<const Stop*> visited;
+    auto current = chooseNextDeparture(startOptions, end, departureTime, nullptr, objective, pheromones);
+    auto next = current->getNextStopTime();
 
-    auto current = chooseNextDeparture(startOptions,
-        end,
-        departureTime,
-        nullptr,
-        objective,
-        pheromones);
-
-    if (!current || !current->getNextStopTime())
+    if (!current || !next)
         return ant;
 
-    auto next = current->getNextStopTime();
+    std::unordered_set<const Stop*> visited;
 
     ant.path.push_back({ current, next });
 
@@ -289,14 +276,14 @@ static Ant buildAnt(
         if (filtered.empty())
             filtered = departures;
 
-        auto it = std::find_if(filtered.begin(), filtered.end(),
+        auto sameTripIt = std::find_if(filtered.begin(), filtered.end(),
             [&](const auto& elem)
             {
                 return elem->getTrip() == current->getTrip();
             });
 
-        if (it != filtered.end() && randomDouble(0.0, 1.0) < SAME_TRIP_PROB)
-            current = *it;
+        if (sameTripIt != filtered.end() && randomDouble(0.0, 1.0) < SAME_TRIP_PROB)
+            current = *sameTripIt;
         else
             current = chooseNextDeparture(filtered, end, next->getTime(), current, objective, pheromones);
 
@@ -346,7 +333,6 @@ static void evaluateAnt(Ant& ant,
     ant.cost = 0.0;
 
     Trip* previousTrip = nullptr;
-
     auto arrival = departureTime;
 
     for (const auto& edge : ant.path)
@@ -366,7 +352,6 @@ static void evaluateAnt(Ant& ant,
         ant.cost += calculateCost(edge);
 
         previousTrip = trip;
-
         arrival = edge.to->getTime();
     }
 }
@@ -569,9 +554,7 @@ std::vector<Path> ACOAlgorithm::findPath(
 
         for (int i = 0; i < ANT_COUNT; i++)
         {
-            Objective objective = (Objective)randomInt(0, 3);
-
-            auto ant = buildAnt(network, start, end, departureTime, objective, pheromones);
+            auto ant = buildAnt(network, start, end, departureTime, pheromones);
             evaluateAnt(ant, departureTime, end);
             ants.push_back(ant);
         }
