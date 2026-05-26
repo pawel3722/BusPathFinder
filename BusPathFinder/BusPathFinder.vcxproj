@@ -150,6 +150,7 @@
     <ClInclude Include="NetworkLoader.h" />
     <ClInclude Include="Path.h" />
     <ClInclude Include="PSOAlgorithm.h" />
+    <ClInclude Include="Result.h" />
     <ClInclude Include="RouteFinder.h" />
     <ClInclude Include="Stop.h" />
     <ClInclude Include="StopTime.h" />
