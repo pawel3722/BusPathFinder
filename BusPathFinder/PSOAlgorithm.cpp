@@ -6,9 +6,9 @@
 #include "PSOAlgorithm.h"
 #include "Functions.h"
 
-#define SWARM_SIZE 80
-#define ITERATIONS 80
-#define MAX_PATH_LENGTH 40
+#define SWARM_SIZE 100
+#define ITERATIONS 100
+#define MAX_PATH_LENGTH 50
 #define MAX_ARCHIVE_SIZE 100
 
 #define MUTATION_PROB 0.20

@@ -13,7 +13,7 @@
 #include "PSOAlgorithm.h"
 #include "Result.h"
 
-int main()
+int main2()
 {
     #ifdef _WIN32
         SetConsoleOutputCP(CP_UTF8);
@@ -173,7 +173,170 @@ int main()
     return 0;
 }
 
-int main2(int argc, char* argv[])
+void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header)
+{
+    os << header << std::endl;
+
+    if (vec.empty())
+    {
+        os << "No results" << std::endl;
+        return;
+    }
+
+    std::chrono::minutes bestArrivalTime = std::chrono::minutes::max();
+    std::chrono::minutes bestTravelTime = std::chrono::minutes::max();
+    std::chrono::minutes bestWaitingTime = std::chrono::minutes::max();
+    std::chrono::milliseconds bestComputationTime = std::chrono::milliseconds::max();
+    int bestTransfers = INT_MAX;
+    int bestParetoSize = 0;
+
+    std::chrono::minutes worstArrivalTime = std::chrono::minutes::zero();
+    std::chrono::minutes worstTravelTime = std::chrono::minutes::zero();
+    std::chrono::minutes worstWaitingTime = std::chrono::minutes::zero();
+    std::chrono::milliseconds worstComputationTime = std::chrono::milliseconds::zero();
+    int worstTransfers = 0;
+    int worstParetoSize = INT_MAX;
+
+    double avgArrivalTime = 0;
+    double avgTravelTime = 0;
+    double avgWaitingTime = 0;
+    double avgComputationTime = 0;
+    double avgTransfers = 0;
+    double avgParetoSize = 0;
+
+    double sqSumArrivalTime = 0;
+    double sqSumTravelTime = 0;
+    double sqSumWaitingTime = 0;
+    double sqSumComputationTime = 0;
+    double sqSumTransfers = 0;
+    double sqSumParetoSize = 0;
+
+    for (const auto& el : vec)
+    {
+        if (el.bestArrivalTime < bestArrivalTime)
+            bestArrivalTime = el.bestArrivalTime;
+        if (el.bestArrivalTime > worstArrivalTime)
+            worstArrivalTime = el.bestArrivalTime;
+        avgArrivalTime += el.bestArrivalTime.count();
+
+        if (el.bestTravelTime < bestTravelTime)
+            bestTravelTime = el.bestTravelTime;
+        if (el.bestTravelTime > worstTravelTime)
+            worstTravelTime = el.bestTravelTime;
+        avgTravelTime += el.bestTravelTime.count();
+
+        if (el.bestWaitingTime < bestWaitingTime)
+            bestWaitingTime = el.bestWaitingTime;
+        if (el.bestWaitingTime > worstWaitingTime)
+            worstWaitingTime = el.bestWaitingTime;
+        avgWaitingTime += el.bestWaitingTime.count();
+
+        if (el.computationTime < bestComputationTime)
+            bestComputationTime = el.computationTime;
+        if (el.computationTime > worstComputationTime)
+            worstComputationTime = el.computationTime;
+        avgComputationTime += el.computationTime.count();
+
+        if (el.bestTransfers < bestTransfers)
+            bestTransfers = el.bestTransfers;
+        if (el.bestTransfers > worstTransfers)
+            worstTransfers = el.bestTransfers;
+        avgTransfers += el.bestTransfers;
+
+        if (el.paths.size() > bestParetoSize)
+            bestParetoSize = el.paths.size();
+        if (el.paths.size() < worstParetoSize)
+            worstParetoSize = el.paths.size();
+        avgParetoSize += el.paths.size();
+    }
+
+    avgArrivalTime /= vec.size();
+    avgTravelTime /= vec.size();
+    avgWaitingTime /= vec.size();
+    avgComputationTime /= vec.size();
+    avgTransfers /= vec.size();
+    avgParetoSize /= vec.size();
+
+
+    for (const auto& el : vec)
+    {
+        sqSumArrivalTime += std::pow(el.bestArrivalTime.count() - avgArrivalTime, 2);
+        sqSumTravelTime += std::pow(el.bestTravelTime.count() - avgTravelTime, 2);
+        sqSumWaitingTime += std::pow(el.bestWaitingTime.count() - avgWaitingTime, 2);
+        sqSumComputationTime += std::pow(el.computationTime.count() - avgComputationTime, 2);
+        sqSumTransfers += std::pow(el.bestTransfers - avgTransfers, 2);
+        sqSumParetoSize += std::pow(el.paths.size() - avgParetoSize, 2);
+    }
+
+    double stdDevArrivalTime = std::sqrt(sqSumArrivalTime / vec.size());
+    double stdDevTravelTime = std::sqrt(sqSumTravelTime / vec.size());
+    double stdDevWaitingTime = std::sqrt(sqSumWaitingTime / vec.size());
+    double stdDevComputationTime = std::sqrt(sqSumComputationTime / vec.size());
+    double stdDevTransfers = std::sqrt(sqSumTransfers / vec.size());
+    double stdDevParetoSize = std::sqrt(sqSumParetoSize / vec.size());
+
+    os << std::left
+        << std::fixed
+        << std::setprecision(2);
+
+    auto fmt = [](double v)
+        {
+            std::ostringstream ss;
+            ss << std::fixed << std::setprecision(2) << v;
+            return ss.str();
+        };
+
+    os << std::setw(20) << "Arrival time:"
+        << std::setw(18) << ("min: " + formatTime(bestArrivalTime))
+        << std::setw(18) << ("max: " + formatTime(worstArrivalTime))
+        << std::setw(18) << ("avg: " + formatTime(std::chrono::minutes(
+            static_cast<long long>(std::round(avgArrivalTime)))))
+        << std::setw(22) << ("std dev: " + formatTime(std::chrono::minutes(
+            static_cast<long long>(std::round(stdDevArrivalTime)))))
+        << '\n';
+
+    os << std::setw(20) << "Travel time:"
+        << std::setw(18) << ("min: " + formatTime(bestTravelTime))
+        << std::setw(18) << ("max: " + formatTime(worstTravelTime))
+        << std::setw(18) << ("avg: " + formatTime(std::chrono::minutes(
+            static_cast<long long>(std::round(avgTravelTime)))))
+        << std::setw(22) << ("std dev: " + formatTime(std::chrono::minutes(
+            static_cast<long long>(std::round(stdDevTravelTime)))))
+        << '\n';
+
+    os << std::setw(20) << "Waiting time:"
+        << std::setw(18) << ("min: " + formatTime(bestWaitingTime))
+        << std::setw(18) << ("max: " + formatTime(worstWaitingTime))
+        << std::setw(18) << ("avg: " + formatTime(std::chrono::minutes(
+            static_cast<long long>(std::round(avgWaitingTime)))))
+        << std::setw(22) << ("std dev: " + formatTime(std::chrono::minutes(
+            static_cast<long long>(std::round(stdDevWaitingTime)))))
+        << '\n';
+
+    os << std::setw(20) << "Transfers:"
+        << std::setw(18) << ("min: " + std::to_string(bestTransfers))
+        << std::setw(18) << ("max: " + std::to_string(worstTransfers))
+        << std::setw(18) << ("avg: " + fmt(avgTransfers))
+        << std::setw(22) << ("std dev: " + fmt(stdDevTransfers))
+        << '\n';
+
+    os << std::setw(20) << "Pareto size:"
+        << std::setw(18) << ("min: " + std::to_string(worstParetoSize))
+        << std::setw(18) << ("max: " + std::to_string(bestParetoSize))
+        << std::setw(18) << ("avg: " + fmt(avgParetoSize))
+        << std::setw(22) << ("std dev: " + fmt(stdDevParetoSize))
+        << '\n';
+
+    os << std::setw(20) << "Computation time:"
+        << std::setw(18) << ("min: " + std::to_string(bestComputationTime.count()) + "ms")
+        << std::setw(18) << ("max: " + std::to_string(worstComputationTime.count()) + "ms")
+        << std::setw(18) << ("avg: " + fmt(avgComputationTime) + "ms")
+        << std::setw(22) << ("std dev: " + fmt(stdDevComputationTime) + "ms")
+        << '\n';
+}
+
+
+int main(int argc, char* argv[])
 {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
@@ -253,6 +416,9 @@ int main2(int argc, char* argv[])
             continue;
 		}
 
+        std::cout << ">>>>>TRIP FROM: " << start->getName() << " <" << start->getId() << "> TO: " << end->getName() << " <" << end->getId() << "> AT: " << formatTime(departureTime) << " <<<<<" << std::endl;
+        outputFile << ">>>>>>>>>>TRIP FROM: " << start->getName() << " <" << start->getId() << "> TO: " << end->getName() << " <" << end->getId() << "> AT: " << formatTime(departureTime) << " <<<<<<<<<<" << std::endl;
+
         for (int i = 0; i < 10; i++)
         {
             auto fGen = std::async(std::launch::async, [&] {
@@ -283,11 +449,15 @@ int main2(int argc, char* argv[])
             auto [resAco, tAco] = fAco.get();
             auto [resPso, tPso] = fPso.get();
 
+            std::cout << "Iteration " << i+1 << "/10" << std::endl;
+
             genResults.emplace_back(resGen, tGen);
             acoResults.emplace_back(resAco, tAco);
             psoResults.emplace_back(resPso, tPso);
         }
-
+        printOutput(outputFile, genResults, "++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++");
+        printOutput(outputFile, acoResults, "++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++");
+        printOutput(outputFile, psoResults, "++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++");
 
 
     }

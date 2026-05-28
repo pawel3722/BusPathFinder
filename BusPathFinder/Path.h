@@ -33,6 +33,7 @@ public:
 	std::chrono::minutes getArrivalTime() const { return arrivalTime; }
 	std::chrono::minutes getTravelTime() const { return travelTime; }
 	std::chrono::minutes getWaitingTime() const { return waitingTime; }
+	bool isValid() const { return message == ""; }
 
 	const std::vector<PathNode>& getNodes() const { return nodes; }
 	friend std::ostream& operator<<(std::ostream& os, const Path& path);
