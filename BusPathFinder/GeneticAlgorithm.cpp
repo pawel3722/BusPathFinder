@@ -346,7 +346,7 @@ void computeCrowdingDistance(
     }
 }
 
-Individual tournamentSelection(
+const Individual& tournamentSelection(
     const std::vector<Individual>& population,
     const Stop* end)
 {

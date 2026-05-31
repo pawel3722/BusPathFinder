@@ -347,6 +347,7 @@ int main(int argc, char* argv[])
 	std::string tripsFile = "gd_trips.json";
 	std::string stopTimesFile = "gd_stop_times.json";
 	std::string outputPath = "output.txt";
+	std::string outputCsvPath = "output.csv";
 	std::string inputPath = "input.txt";
 
 	if (argc >= 4)
@@ -372,6 +373,13 @@ int main(int argc, char* argv[])
 		std::cout << "Could not open output file." << std::endl;
 		return 0;
 	}
+    std::ofstream outputCsvFile(outputCsvPath);
+    if (!outputCsvFile.is_open())
+    {
+        std::cout << "Could not open output csv file." << std::endl;
+        return 0;
+    }
+
     auto network = NetworkLoader::load(stopsFile, tripsFile, stopTimesFile);
 
     GeneticAlgorithm genAlg;
@@ -382,6 +390,7 @@ int main(int argc, char* argv[])
     RouteFinder psoAlgRouteFinder(network, psoAlg);
 
     std::string line;
+    int experiment = 0;
 
     while (getline(inputFile, line))
     {
@@ -416,8 +425,8 @@ int main(int argc, char* argv[])
             continue;
 		}
 
-        std::cout << ">>>>>TRIP FROM: " << start->getName() << " <" << start->getId() << "> TO: " << end->getName() << " <" << end->getId() << "> AT: " << formatTime(departureTime) << " <<<<<" << std::endl;
-        outputFile << ">>>>>>>>>>TRIP FROM: " << start->getName() << " <" << start->getId() << "> TO: " << end->getName() << " <" << end->getId() << "> AT: " << formatTime(departureTime) << " <<<<<<<<<<" << std::endl;
+        std::cout << ">>>>>Experiment: " << experiment << " TRIP FROM: " << start->getName() << " <" << start->getId() << "> TO: " << end->getName() << " <" << end->getId() << "> AT: " << formatTime(departureTime) << " <<<<<" << std::endl;
+        outputFile << ">>>>>>>>>>Experiment: " << experiment << " TRIP FROM: " << start->getName() << " <" << start->getId() << "> TO: " << end->getName() << " <" << end->getId() << "> AT: " << formatTime(departureTime) << " <<<<<<<<<<" << std::endl;
 
         for (int i = 0; i < 10; i++)
         {
@@ -451,6 +460,19 @@ int main(int argc, char* argv[])
 
             std::cout << "Iteration " << i+1 << "/10" << std::endl;
 
+            for (const auto& el : resGen)
+            {
+                outputCsvFile << experiment << ",GEN," << i << ',' << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tGen.count() << '\n';
+            }
+            for (const auto& el : resAco)
+            {
+                outputCsvFile << experiment << ",ACO," << i << ',' << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tAco.count() << '\n';
+            }
+            for (const auto& el : resPso)
+            {
+                outputCsvFile << experiment << ",PSO," << i << ',' << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tPso.count() << '\n';
+            }
+
             genResults.emplace_back(resGen, tGen);
             acoResults.emplace_back(resAco, tAco);
             psoResults.emplace_back(resPso, tPso);
@@ -459,6 +481,6 @@ int main(int argc, char* argv[])
         printOutput(outputFile, acoResults, "++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++");
         printOutput(outputFile, psoResults, "++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++");
 
-
+        experiment++;
     }
 }
