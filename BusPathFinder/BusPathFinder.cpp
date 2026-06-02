@@ -23,8 +23,8 @@ int main()
 
 
 
-   //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
-   auto network = NetworkLoaderGZM::load(".\\GZM");
+   auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
+   //auto network = NetworkLoaderGZM::load(".\\GZM");
 
     GeneticAlgorithm genAlg;
     ACOAlgorithm acoAlg;
