@@ -1,0 +1,428 @@
+#include "NetworkLoaderGZM.h"
+#include "Functions.h"
+
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <regex>
+#include <filesystem>
+#include <unordered_map>
+#include <unordered_set>
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <algorithm>
+#include <cctype>
+
+namespace fs = std::filesystem;
+
+// =========================
+// CSV helpers
+// =========================
+
+static std::vector<std::string> parseCsvLine(const std::string& line)
+{
+    std::vector<std::string> result;
+    std::string current;
+    bool inQuotes = false;
+
+    for (size_t i = 0; i < line.size(); ++i)
+    {
+        char c = line[i];
+
+        if (c == '"')
+        {
+            if (inQuotes && i + 1 < line.size() && line[i + 1] == '"')
+            {
+                current += '"';
+                ++i;
+            }
+            else
+            {
+                inQuotes = !inQuotes;
+            }
+        }
+        else if (c == ',' && !inQuotes)
+        {
+            result.push_back(current);
+            current.clear();
+        }
+        else
+        {
+            current += c;
+        }
+    }
+
+    result.push_back(current);
+    return result;
+}
+
+static std::unordered_map<std::string, int> makeHeaderIndex(
+    const std::vector<std::string>& header
+)
+{
+    std::unordered_map<std::string, int> result;
+
+    for (int i = 0; i < static_cast<int>(header.size()); ++i)
+        result[header[i]] = i;
+
+    return result;
+}
+
+static std::string getRequired(
+    const std::vector<std::string>& row,
+    const std::unordered_map<std::string, int>& header,
+    const std::string& column
+)
+{
+    auto it = header.find(column);
+
+    if (it == header.end())
+        throw std::runtime_error("Missing required GTFS column: " + column);
+
+    int index = it->second;
+
+    if (index < 0 || index >= static_cast<int>(row.size()))
+        return "";
+
+    return row[index];
+}
+
+static std::string getOptional(
+    const std::vector<std::string>& row,
+    const std::unordered_map<std::string, int>& header,
+    const std::string& column,
+    const std::string& defaultValue = ""
+)
+{
+    auto it = header.find(column);
+
+    if (it == header.end())
+        return defaultValue;
+
+    int index = it->second;
+
+    if (index < 0 || index >= static_cast<int>(row.size()))
+        return defaultValue;
+
+    return row[index];
+}
+
+static bool endsWith(const std::string& str, const std::string& suffix)
+{
+    if (suffix.size() > str.size())
+        return false;
+
+    return std::equal(
+        suffix.rbegin(),
+        suffix.rend(),
+        str.rbegin()
+    );
+}
+
+static std::string trim(const std::string& s)
+{
+    size_t start = 0;
+
+    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start])))
+        ++start;
+
+    size_t end = s.size();
+
+    while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1])))
+        --end;
+
+    return s.substr(start, end - start);
+}
+
+static std::string baseStopName(const std::string& name)
+{
+    std::string s = trim(name);
+
+    size_t pos = s.find_last_of(' ');
+
+    if (pos == std::string::npos)
+        return s;
+
+    std::string last = s.substr(pos + 1);
+
+    if (last.empty())
+        return s;
+
+    for (char c : last)
+    {
+        if (!std::isdigit(static_cast<unsigned char>(c)))
+            return s;
+    }
+
+    return trim(s.substr(0, pos));
+}
+
+// =========================
+// Loader
+// =========================
+
+Network NetworkLoaderGZM::load(
+    const std::string& gtfsDirectory
+)
+{
+    std::unordered_map<int, std::unique_ptr<Stop>> stops;
+    std::unordered_set<std::unique_ptr<StopTime>> stopTimes;
+    std::unordered_map<std::string, std::unique_ptr<Trip>> trips;
+
+    std::map<int, Stop*> platformsAssignments;
+
+    fs::path dir(gtfsDirectory);
+
+    fs::path stopsFile = dir / "stops.txt";
+    fs::path stopsExtFile = dir / "stops_ext.txt";
+    fs::path tripsFile = dir / "trips.txt";
+    fs::path stopTimesFile = dir / "stop_times.txt";
+
+
+    // =========================
+    // STOPS
+    // grupowanie platform po nazwie bazowej
+    // =========================
+
+    struct StopGroup
+    {
+        int id = -1;
+        int zone = 0;
+        std::string name;
+        double latSum = 0.0;
+        double lonSum = 0.0;
+        int count = 0;
+        std::vector<int> platformIds;
+    };
+
+    std::unordered_map<std::string, StopGroup> groupedStops;
+
+    {
+        std::ifstream file(stopsFile);
+        std::ifstream fileExt(stopsExtFile);
+
+        if (!file)
+            throw std::runtime_error("Cannot open stops.txt");
+        if (!fileExt)
+            throw std::runtime_error("Cannot open stops_ext.txt");
+
+        std::string line;
+        std::string lineExt;
+
+        if (!std::getline(file, line))
+            throw std::runtime_error("stops.txt is empty");
+
+        if (!std::getline(fileExt, lineExt))
+            throw std::runtime_error("stops_ext.txt is empty");
+
+        auto header = makeHeaderIndex(parseCsvLine(line));
+        auto headerExt = makeHeaderIndex(parseCsvLine(lineExt));
+
+        while (std::getline(file, line))
+        {
+            if (line.empty())
+                continue;
+
+            std::getline(fileExt, lineExt);
+
+            auto row = parseCsvLine(line);
+            auto rowExt = parseCsvLine(lineExt);
+
+            int platformId = std::stoi(getRequired(row, header, "stop_id"));
+            int platformIdExt = std::stoi(getRequired(rowExt, headerExt, "stop_id"));
+
+            if (platformId != platformIdExt)
+                std::cout << "Brak platformExt: " << platformId << std::endl;
+
+            std::string stopType = getOptional(rowExt, headerExt, "stop_attribute_ids", "0");
+            if (stopType == "5" || stopType == "6")
+                continue;
+
+            std::string groupedName = getRequired(row, header, "stop_name");
+            std::string platformName = getRequired(rowExt, headerExt, "stop_code_add");
+            std::string stopName = groupedName + " " + platformName;
+
+            double lat = std::stod(getRequired(row, header, "stop_lat"));
+            double lon = std::stod(getRequired(row, header, "stop_lon"));
+
+            int zone = 0;
+            std::string zoneStr = getOptional(rowExt, headerExt, "community_ids", "0");
+
+            if (!zoneStr.empty())
+            {
+                try
+                {
+                    zone = std::stoi(zoneStr);
+                }
+                catch (...)
+                {
+                    zone = 0;
+                }
+            }
+
+            auto& group = groupedStops[groupedName];
+
+            if (group.count == 0)
+            {
+                group.id = platformId;
+                group.zone = zone;
+                group.name = groupedName;
+            }
+            else
+            {
+                group.id = std::min(group.id, platformId);
+            }
+
+            group.latSum += lat;
+            group.lonSum += lon;
+            group.count++;
+            group.platformIds.push_back(platformId);
+        }
+    }
+
+    for (auto& [name, group] : groupedStops)
+    {
+        double lat = group.latSum / group.count;
+        double lon = group.lonSum / group.count;
+
+        stops[group.id] = std::make_unique<Stop>(
+            group.id,
+            group.zone,
+            group.name,
+            lat,
+            lon
+        );
+
+        Stop* stopPtr = stops[group.id].get();
+
+        for (int platformId : group.platformIds)
+            platformsAssignments[platformId] = stopPtr;
+    }
+
+    // =========================
+    // TRIPS
+    // =========================
+
+    {
+        std::ifstream file(tripsFile);
+
+        if (!file)
+            throw std::runtime_error("Cannot open trips.txt");
+
+        std::string line;
+
+        if (!std::getline(file, line))
+            throw std::runtime_error("trips.txt is empty");
+
+        auto header = makeHeaderIndex(parseCsvLine(line));
+
+        std::regex r(R"(^([A-Za-z0-9+]+)/)");
+
+        while (std::getline(file, line))
+        {
+            if (line.empty())
+                continue;
+
+            auto row = parseCsvLine(line);
+
+            std::string id = getRequired(row, header, "trip_id");
+            std::string routeId = getOptional(row, header, "shape_id", "");
+            std::string tripName = getOptional(row, header, "trip_short_name", "");
+
+            std::string lineName = "";
+
+            std::smatch match;
+            if (std::regex_search(tripName, match, r))
+                lineName = match[1];
+
+            std::string direction = getOptional(row, header, "trip_headsign", "");
+            std::string jobId = getOptional(row, header, "block_id", "");
+
+            trips[id] = std::make_unique<Trip>(
+                id,
+                lineName,
+                direction,
+                routeId,
+                jobId
+            );
+        }
+    }
+
+    // =========================
+    // STOP TIMES
+    // tylko trip_id istniejące w trips
+    // =========================
+
+    {
+        std::ifstream file(stopTimesFile);
+
+        if (!file)
+            throw std::runtime_error("Cannot open stop_times.txt");
+
+        std::string line;
+
+        if (!std::getline(file, line))
+            throw std::runtime_error("stop_times.txt is empty");
+
+        auto header = makeHeaderIndex(parseCsvLine(line));
+
+        int skippedStops = 0;
+
+        while (std::getline(file, line))
+        {
+            if (line.empty())
+                continue;
+
+            auto row = parseCsvLine(line);
+
+            std::string tripId = getRequired(row, header, "trip_id");
+
+            auto tripIt = trips.find(tripId);
+
+            if (tripIt == trips.end())
+                continue;
+
+            Trip* trip = tripIt->second.get();
+
+            std::chrono::minutes time =
+                parseTime(getRequired(row, header, "arrival_time"));
+
+            int platformId = std::stoi(getRequired(row, header, "stop_id"));
+
+            auto stopIt = platformsAssignments.find(platformId);
+
+            int index = std::stoi(getRequired(row, header, "stop_sequence"));
+
+            if (index == 0)
+                skippedStops = 0;
+
+            if (stopIt == platformsAssignments.end())
+            {
+                skippedStops++;
+                continue;
+            }
+
+            Stop* stop = stopIt->second;
+
+            
+
+            auto ptr = std::make_unique<StopTime>(
+                stop,
+                trip,
+                time,
+                index - skippedStops
+            );
+
+            trip->addStopTime(ptr.get());
+
+            stopTimes.insert(std::move(ptr));
+        }
+    }
+
+    return Network(
+        std::move(stops),
+        std::move(stopTimes),
+        std::move(trips)
+    );
+}

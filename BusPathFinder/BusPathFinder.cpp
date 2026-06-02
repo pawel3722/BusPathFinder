@@ -5,7 +5,8 @@
 #include <windows.h>
 #include <string>
 #include <future>
-#include "NetworkLoader.h"
+#include "NetworkLoaderGdansk.h"
+#include "NetworkLoaderGZM.h"
 #include "GeneticAlgorithm.h"
 #include "RouteFinder.h"
 #include "Functions.h" 
@@ -13,7 +14,7 @@
 #include "PSOAlgorithm.h"
 #include "Result.h"
 
-int main2()
+int main()
 {
     #ifdef _WIN32
         SetConsoleOutputCP(CP_UTF8);
@@ -22,7 +23,8 @@ int main2()
 
 
 
-    auto network = NetworkLoader::load("gd_stops.json","gd_trips.json","gd_stop_times.json");
+   //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
+   auto network = NetworkLoaderGZM::load(".\\GZM");
 
     GeneticAlgorithm genAlg;
     ACOAlgorithm acoAlg;
@@ -336,7 +338,7 @@ void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header
 }
 
 
-int main(int argc, char* argv[])
+int main2(int argc, char* argv[])
 {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
@@ -380,7 +382,7 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    auto network = NetworkLoader::load(stopsFile, tripsFile, stopTimesFile);
+    auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
 
     GeneticAlgorithm genAlg;
     ACOAlgorithm acoAlg;

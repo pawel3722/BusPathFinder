@@ -602,10 +602,16 @@ static bool skipConnection(Individual& individual, const Network& network)
                 newGenes.push_back(el);
             }
 
+            if (index1 < 0 || index1 >= st1.size() - 1)
+                bool fail = true;
+
             while (index1 + 1 < st1.size() && st1[index1]->getStop() != commonStop->getStop())
             {
                 newGenes.push_back({ st1[index1], st1[ ++index1] });
             }
+
+            if (index2 < 0 || index2 >= st2.size() - 1)
+                bool fail = true;
 
             if (st1[index1]->getTime().count() + MIN_TRANSFER_DURATION > st2[index2]->getTime().count())
                 continue;
@@ -770,11 +776,6 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
     for (int generation = 0; generation < GENERATIONS; generation++)
     {
-
-
-
-
-
         // ocena
         for (auto& individual : population)
         {

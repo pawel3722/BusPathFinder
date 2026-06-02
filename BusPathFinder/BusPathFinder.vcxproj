@@ -130,7 +130,8 @@
     <ClCompile Include="Functions.cpp" />
     <ClCompile Include="GeneticAlgorithm.cpp" />
     <ClCompile Include="Network.cpp" />
-    <ClCompile Include="NetworkLoader.cpp" />
+    <ClCompile Include="NetworkLoaderGdansk.cpp" />
+    <ClCompile Include="NetworkLoaderGZM.cpp" />
     <ClCompile Include="Path.cpp" />
     <ClCompile Include="PSOAlgorithm.cpp" />
   </ItemGroup>
@@ -147,7 +148,8 @@
     <ClInclude Include="IAlgorithm.h" />
     <ClInclude Include="json.hpp" />
     <ClInclude Include="Network.h" />
-    <ClInclude Include="NetworkLoader.h" />
+    <ClInclude Include="NetworkLoaderGdansk.h" />
+    <ClInclude Include="NetworkLoaderGZM.h" />
     <ClInclude Include="Path.h" />
     <ClInclude Include="PSOAlgorithm.h" />
     <ClInclude Include="Result.h" />
