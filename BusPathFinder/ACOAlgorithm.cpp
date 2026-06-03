@@ -10,7 +10,7 @@
 
 #define ANT_COUNT 80
 #define ITERATIONS 80
-#define MAX_PATH_LENGTH 70
+#define MAX_PATH_LENGTH 50
 #define MAX_ARCHIVE_SIZE 100
 
 #define ALPHA 1.0

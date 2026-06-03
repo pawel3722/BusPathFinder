@@ -8,7 +8,7 @@
 
 #define SWARM_SIZE 100
 #define ITERATIONS 100
-#define MAX_PATH_LENGTH 70
+#define MAX_PATH_LENGTH 50
 #define MAX_ARCHIVE_SIZE 100
 
 #define MUTATION_PROB 0.20
