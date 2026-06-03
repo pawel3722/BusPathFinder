@@ -1,27 +1,15 @@
-import json
+import csv
 import math
 import random
 
-INPUT_FILE = "gd_stops.json"
+INPUT_FILE = "stops.txt"
 OUTPUT_FILE = "input.txt"
 
-# liczba par dla każdej kategorii
-N = 3
+N = 5
 
-# zakres godzin
 START_HOUR = 6
 END_HOUR = 21
 
-# =========================
-# Wczytanie przystanków
-# =========================
-
-with open(INPUT_FILE, encoding="utf-8") as f:
-    stops = json.load(f)
-
-# =========================
-# Distance helper
-# =========================
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371.0
@@ -36,17 +24,37 @@ def haversine(lat1, lon1, lat2, lon2):
 
     a = (
         math.sin(dlat / 2) ** 2
-        + math.cos(lat1)
-        * math.cos(lat2)
-        * math.sin(dlon / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
     )
 
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
-    return R * c  # km
+
+def random_time():
+    hour = random.randint(START_HOUR, END_HOUR)
+    minute = random.randint(0, 59)
+    return f"{hour:02}:{minute:02}"
+
 
 # =========================
-# Generowanie wszystkich par
+# Wczytanie przystanków z GTFS stops.txt
+# =========================
+
+stops = []
+
+with open(INPUT_FILE, newline="", encoding="utf-8") as f:
+    reader = csv.DictReader(f)
+
+    for row in reader:
+        stops.append({
+            "id": int(row["stop_id"]),
+            "lat": float(row["stop_lat"]),
+            "lon": float(row["stop_lon"]),
+            "name": row["stop_name"]
+        })
+
+# =========================
+# Generowanie par
 # =========================
 
 pairs = []
@@ -56,12 +64,7 @@ for i in range(len(stops)):
         a = stops[i]
         b = stops[j]
 
-        dist = haversine(
-            a["lat"],
-            a["lon"],
-            b["lat"],
-            b["lon"]
-        )
+        dist = haversine(a["lat"], a["lon"], b["lat"], b["lon"])
 
         pairs.append({
             "start": a["id"],
@@ -69,50 +72,32 @@ for i in range(len(stops)):
             "distance": dist
         })
 
-# =========================
-# Sortowanie po dystansie
-# =========================
-
 pairs.sort(key=lambda x: x["distance"])
 
 total = len(pairs)
 
-# podział na grupy
-close_pairs = pairs[: total // 3]
-medium_pairs = pairs[total // 3 : 2 * total // 3]
+print(f"MIN odleglosc: {pairs[0]['distance']}")
+print(f"Min odleglosc: {pairs[2 * total // 3]['distance']}")
+print(f"Max odleglosc: {pairs[-1]['distance']}")
+
+# close_pairs = pairs[: total // 3]
+# medium_pairs = pairs[total // 3 : 2 * total // 3]
 far_pairs = pairs[2 * total // 3 :]
 
-# losowanie
 selected = []
 
-selected += random.sample(close_pairs, min(N, len(close_pairs)))
-selected += random.sample(medium_pairs, min(N, len(medium_pairs)))
+# selected += random.sample(close_pairs, min(N, len(close_pairs)))
+# selected += random.sample(medium_pairs, min(N, len(medium_pairs)))
 selected += random.sample(far_pairs, min(N, len(far_pairs)))
 
-#random.shuffle(selected)
+random.shuffle(selected)
 
 # =========================
-# Losowa godzina
-# =========================
-
-def random_time():
-    hour = random.randint(START_HOUR, END_HOUR)
-    minute = random.randint(0, 59)
-
-    return f"{hour:02}:{minute:02}"
-
-# =========================
-# Zapis
+# Zapis input.txt
 # =========================
 
 with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
     for pair in selected:
-        line = (
-            f"{pair['start']} "
-            f"{pair['end']} "
-            f"{random_time()}"
-        )
-
-        f.write(line + "\n")
+        f.write(f"{pair['start']} {pair['end']} {random_time()}\n")
 
 print(f"Zapisano {len(selected)} par do {OUTPUT_FILE}")

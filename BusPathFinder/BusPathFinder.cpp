@@ -14,7 +14,7 @@
 #include "PSOAlgorithm.h"
 #include "Result.h"
 
-int main()
+int main2()
 {
     #ifdef _WIN32
         SetConsoleOutputCP(CP_UTF8);
@@ -23,8 +23,8 @@ int main()
 
 
 
-   auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
-   //auto network = NetworkLoaderGZM::load(".\\GZM");
+   //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
+   auto network = NetworkLoaderGZM::load(".\\GZM");
 
     GeneticAlgorithm genAlg;
     ACOAlgorithm acoAlg;
@@ -213,8 +213,12 @@ void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header
     double sqSumTransfers = 0;
     double sqSumParetoSize = 0;
 
+    int validCount = 0;
+
     for (const auto& el : vec)
     {
+        if (!el.isValid)
+            continue;
         if (el.bestArrivalTime < bestArrivalTime)
             bestArrivalTime = el.bestArrivalTime;
         if (el.bestArrivalTime > worstArrivalTime)
@@ -250,18 +254,28 @@ void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header
         if (el.paths.size() < worstParetoSize)
             worstParetoSize = el.paths.size();
         avgParetoSize += el.paths.size();
+        validCount++;
     }
 
-    avgArrivalTime /= vec.size();
-    avgTravelTime /= vec.size();
-    avgWaitingTime /= vec.size();
-    avgComputationTime /= vec.size();
-    avgTransfers /= vec.size();
-    avgParetoSize /= vec.size();
+    if (!validCount)
+    {
+        os << "No valid result found!" << std::endl;
+        return;
+    }
+
+    avgArrivalTime /= validCount;
+    avgTravelTime /= validCount;
+    avgWaitingTime /= validCount;
+    avgComputationTime /= validCount;
+    avgTransfers /= validCount;
+    avgParetoSize /= validCount;
 
 
     for (const auto& el : vec)
     {
+        if (!el.isValid)
+            continue;
+
         sqSumArrivalTime += std::pow(el.bestArrivalTime.count() - avgArrivalTime, 2);
         sqSumTravelTime += std::pow(el.bestTravelTime.count() - avgTravelTime, 2);
         sqSumWaitingTime += std::pow(el.bestWaitingTime.count() - avgWaitingTime, 2);
@@ -270,12 +284,12 @@ void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header
         sqSumParetoSize += std::pow(el.paths.size() - avgParetoSize, 2);
     }
 
-    double stdDevArrivalTime = std::sqrt(sqSumArrivalTime / vec.size());
-    double stdDevTravelTime = std::sqrt(sqSumTravelTime / vec.size());
-    double stdDevWaitingTime = std::sqrt(sqSumWaitingTime / vec.size());
-    double stdDevComputationTime = std::sqrt(sqSumComputationTime / vec.size());
-    double stdDevTransfers = std::sqrt(sqSumTransfers / vec.size());
-    double stdDevParetoSize = std::sqrt(sqSumParetoSize / vec.size());
+    double stdDevArrivalTime = std::sqrt(sqSumArrivalTime / validCount);
+    double stdDevTravelTime = std::sqrt(sqSumTravelTime / validCount);
+    double stdDevWaitingTime = std::sqrt(sqSumWaitingTime / validCount);
+    double stdDevComputationTime = std::sqrt(sqSumComputationTime / validCount);
+    double stdDevTransfers = std::sqrt(sqSumTransfers / validCount);
+    double stdDevParetoSize = std::sqrt(sqSumParetoSize / validCount);
 
     os << std::left
         << std::fixed
@@ -338,30 +352,16 @@ void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header
 }
 
 
-int main2(int argc, char* argv[])
+int main(int argc, char* argv[])
 {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 #endif
 
-	std::string stopsFile = "gd_stops.json";
-	std::string tripsFile = "gd_trips.json";
-	std::string stopTimesFile = "gd_stop_times.json";
-	std::string outputPath = "output.txt";
-	std::string outputCsvPath = "output.csv";
-	std::string inputPath = "input.txt";
-
-	if (argc >= 4)
-	{
-		stopsFile = argv[1];
-		tripsFile = argv[2];
-		stopTimesFile = argv[3];
-	}
-	if (argc >= 5)
-	{
-		inputPath = argv[4];
-	}
+	std::string outputPath = R"(GZM\output.txt)";
+	std::string outputCsvPath = R"(GZM\output.csv)";
+	std::string inputPath = R"(GZM\input.txt)";
 
 	std::ifstream inputFile(inputPath);
     if (!inputFile.is_open())
@@ -382,7 +382,8 @@ int main2(int argc, char* argv[])
         return 0;
     }
 
-    auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
+    auto network = NetworkLoaderGZM::load(".\\GZM");
+    //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
 
     GeneticAlgorithm genAlg;
     ACOAlgorithm acoAlg;
@@ -464,15 +465,24 @@ int main2(int argc, char* argv[])
 
             for (const auto& el : resGen)
             {
-                outputCsvFile << experiment << ",GEN," << i << ',' << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tGen.count() << '\n';
+                if (el.isValid())
+                    outputCsvFile << experiment << ",GEN," << i << ",1," << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tGen.count() << '\n';
+                else
+                    outputCsvFile << experiment << ",GEN," << i << ",0,0,0,0,0,0\n";
             }
             for (const auto& el : resAco)
             {
-                outputCsvFile << experiment << ",ACO," << i << ',' << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tAco.count() << '\n';
+                if (el.isValid())
+                    outputCsvFile << experiment << ",ACO," << i << ",1," << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tAco.count() << '\n';
+                else
+                    outputCsvFile << experiment << ",ACO," << i << ",0,0,0,0,0,0\n";
             }
             for (const auto& el : resPso)
             {
-                outputCsvFile << experiment << ",PSO," << i << ',' << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tPso.count() << '\n';
+                if (el.isValid())
+                    outputCsvFile << experiment << ",PSO," << i << ",1," << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tPso.count() << '\n';
+                else
+                    outputCsvFile << experiment << ",PSO," << i << ",0,0,0,0,0,0\n";
             }
 
             genResults.emplace_back(resGen, tGen);

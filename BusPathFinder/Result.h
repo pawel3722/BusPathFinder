@@ -10,6 +10,7 @@ struct Result
 	std::chrono::minutes bestWaitingTime = std::chrono::minutes::max();
 	int bestTransfers = std::numeric_limits<int>::max();
 	std::chrono::milliseconds computationTime = std::chrono::milliseconds::max();
+	bool isValid = false;
 
 	Result(std::vector<Path> p, std::chrono::milliseconds compTime): computationTime(compTime)
 	{
@@ -26,6 +27,7 @@ struct Result
 			if (path.getTransfers() < bestTransfers)
 				bestTransfers = path.getTransfers();
 			paths.push_back(path);
+			isValid = true;
 		}
 	}
 };
