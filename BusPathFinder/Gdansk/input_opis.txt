@@ -1,8 +1,8 @@
 Min odleglosc: 10.96319000118741
 Max odleglosc: 37.884004833328525
 
-Poznańska - Pruszcz Gdański Powstańców Warszawy/Plater
-Baza Manipulacyjna - Ujeścisko
-Sobieszewko - Plac Komorowskiego
-Platynowa - Komary
-Soplicy - Forsycji
+Poznańska - Pruszcz Gdański Powstańców Warszawy/Plater 18,41 km
+Sobieszewko - Plac Komorowskiego 16,08 km
+Platynowa - Komary 18,36 km
+Soplicy - Forsycji 16,29 km
+Jodowa - Żwirki i Wigury 14,80 km

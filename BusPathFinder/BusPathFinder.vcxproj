@@ -132,6 +132,7 @@
     <ClCompile Include="Network.cpp" />
     <ClCompile Include="NetworkLoaderGdansk.cpp" />
     <ClCompile Include="NetworkLoaderGZM.cpp" />
+    <ClCompile Include="NetworkLoaderZG.cpp" />
     <ClCompile Include="Path.cpp" />
     <ClCompile Include="PSOAlgorithm.cpp" />
   </ItemGroup>
@@ -148,6 +149,7 @@
     <ClInclude Include="IAlgorithm.h" />
     <ClInclude Include="json.hpp" />
     <ClInclude Include="Network.h" />
+    <ClInclude Include="NetworkLoaderZG.h" />
     <ClInclude Include="NetworkLoaderGdansk.h" />
     <ClInclude Include="NetworkLoaderGZM.h" />
     <ClInclude Include="Path.h" />

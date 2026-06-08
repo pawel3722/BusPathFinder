@@ -11,7 +11,6 @@
 #define ANT_COUNT 100
 #define ITERATIONS 100
 #define MAX_PATH_LENGTH 70
-#define MAX_ARCHIVE_SIZE 100
 
 #define ALPHA 1.0
 #define BETA 1.0
@@ -19,7 +18,7 @@
 
 #define MIN_TRANSFER_DURATION 3
 #define MAX_DEPARTURES_PER_ROUTE 5
-#define SAME_TRIP_PROB 0.9
+#define SAME_TRIP_PROB 0.95
 
 enum Objective
 {
@@ -398,7 +397,7 @@ static void updateParetoArchive(std::vector<Ant>& archive,
 
     archive.push_back(candidate);
 
-    if (archive.size() > MAX_ARCHIVE_SIZE)
+    if (archive.size() > ANT_COUNT)
     {
         archive.erase(archive.begin() + randomInt(0, archive.size() - 1));
     }

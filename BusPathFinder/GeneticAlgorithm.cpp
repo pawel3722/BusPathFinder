@@ -14,6 +14,11 @@
 #define MAX_DEPARTURES_PER_ROUTE 1
 #define SAME_TRIP_PROB 0.95
 
+#define RANDOM_MUTATION_PROB 0.2
+#define WAITING_MUTATION_PROB 0.5
+#define TRANSFER_MUTATION_PROB 0.3
+
+
 struct Individual
 {
     std::vector<ConnectionTime> genes;
@@ -806,18 +811,18 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
 
             auto child = crossover(parent1, parent2, end);
 
-            if (randomDouble(0.0, 1.0) < 0.2)
+            if (randomDouble(0.0, 1.0) < RANDOM_MUTATION_PROB)
                 mutate(child, network, end);
 
             evaluateIndividual(child, departureTime, end);
 
-            if (child.isValid && child.transfers > 0 && randomDouble(0.0, 1.0) < 0.5)
+            if (child.isValid && child.transfers > 0 && randomDouble(0.0, 1.0) < WAITING_MUTATION_PROB)
             {
                 fixWaitingTimes(child, network);
                 evaluateIndividual(child, departureTime, end);
             }
 
-            if (child.isValid && child.transfers >= 2 && randomDouble(0.0, 1.0) < 0.3)
+            if (child.isValid && child.transfers >= 2 && randomDouble(0.0, 1.0) < TRANSFER_MUTATION_PROB)
             {
                 skipConnection(child, network);
                 evaluateIndividual(child, departureTime, end);

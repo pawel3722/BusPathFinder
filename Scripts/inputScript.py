@@ -42,7 +42,7 @@ def random_time():
 
 stops = []
 
-with open(INPUT_FILE, newline="", encoding="utf-8") as f:
+with open(INPUT_FILE, newline="", encoding="utf-8-sig") as f:
     reader = csv.DictReader(f)
 
     for row in reader:
@@ -77,12 +77,12 @@ pairs.sort(key=lambda x: x["distance"])
 total = len(pairs)
 
 print(f"MIN odleglosc: {pairs[0]['distance']}")
-print(f"Min odleglosc: {pairs[2 * total // 3]['distance']}")
+print(f"Min odleglosc: {pairs[3 * total // 4]['distance']}")
 print(f"Max odleglosc: {pairs[-1]['distance']}")
 
 # close_pairs = pairs[: total // 3]
 # medium_pairs = pairs[total // 3 : 2 * total // 3]
-far_pairs = pairs[2 * total // 3 :]
+far_pairs = pairs[3 * total // 4 :]
 
 selected = []
 
@@ -96,7 +96,7 @@ random.shuffle(selected)
 # Zapis input.txt
 # =========================
 
-with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+with open(OUTPUT_FILE, "w", encoding="utf-8-sig") as f:
     for pair in selected:
         f.write(f"{pair['start']} {pair['end']} {random_time()}\n")
 

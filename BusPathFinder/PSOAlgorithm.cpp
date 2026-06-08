@@ -9,9 +9,8 @@
 #define SWARM_SIZE 100
 #define ITERATIONS 100
 #define MAX_PATH_LENGTH 70
-#define MAX_ARCHIVE_SIZE 100
 
-#define MUTATION_PROB 0.20
+#define RANDOM_MUTATION_PROB 0.20
 #define PBEST_PROB 0.45
 #define GBEST_PROB 0.45
 
@@ -353,7 +352,7 @@ static void updateArchive(std::vector<Particle>& archive, const Particle& candid
 
     archive.push_back(candidate);
 
-    if (archive.size() > MAX_ARCHIVE_SIZE)
+    if (archive.size() > SWARM_SIZE)
     {
         archive.erase(archive.begin() + randomInt(0, archive.size() - 1));
     }
@@ -554,7 +553,7 @@ std::vector<Path> PSOAlgorithm::findPath(const Network& network, const Stop* sta
                 followPath(particle, leader, leader.path, network, end);
             }
 
-            if (randomDouble(0.0, 1.0) < MUTATION_PROB)
+            if (randomDouble(0.0, 1.0) < RANDOM_MUTATION_PROB)
             {
                 rerouteFromIndex(particle, leader, network, end, randomInt(0, particle.path.size() - 1));
             }

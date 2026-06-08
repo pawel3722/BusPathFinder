@@ -1,8 +1,8 @@
 Min odleglosc: 26.962336881722116
 Max odleglosc: 76.21074526108731
 
-Dziećkowice Ośrodek Zdrowia - Rokitnica Szyb Ignacy nż
-Kotulin Szkoła - Chorzów Nowa
-Gliwice Sportowa - Wygorzele Długa
-Pniowiec Dom Nauczyciela - Osiedle Bór Długa I
-Wilkowyje Murarska - Boruszowice Hanusek
+Dziećkowice Ośrodek Zdrowia - Rokitnica Szyb Ignacy nż 35,34 km
+Kotulin Szkoła - Chorzów Nowa 41,40 km
+Gliwice Sportowa - Wygorzele Długa 30,69 km
+Pniowiec Dom Nauczyciela - Osiedle Bór Długa I 37,80 km
+Wilkowyje Murarska - Boruszowice Hanusek 41,69 km

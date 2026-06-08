@@ -7,6 +7,7 @@
 #include <future>
 #include "NetworkLoaderGdansk.h"
 #include "NetworkLoaderGZM.h"
+#include "NetworkLoaderZG.h"
 #include "GeneticAlgorithm.h"
 #include "RouteFinder.h"
 #include "Functions.h" 
@@ -14,7 +15,7 @@
 #include "PSOAlgorithm.h"
 #include "Result.h"
 
-int main2()
+int main()
 {
     #ifdef _WIN32
         SetConsoleOutputCP(CP_UTF8);
@@ -22,8 +23,8 @@ int main2()
     #endif
 
 
-
-   auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
+   auto network = NetworkLoaderZG::load(".\\ZielonaGora");
+   //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
    //auto network = NetworkLoaderGZM::load(".\\GZM");
 
     GeneticAlgorithm genAlg;
@@ -352,7 +353,7 @@ void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header
 }
 
 
-int main(int argc, char* argv[])
+int main1(int argc, char* argv[])
 {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
