@@ -23,8 +23,8 @@ int main2()
 
 
 
-   //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
-   auto network = NetworkLoaderGZM::load(".\\GZM");
+   auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
+   //auto network = NetworkLoaderGZM::load(".\\GZM");
 
     GeneticAlgorithm genAlg;
     ACOAlgorithm acoAlg;
@@ -359,9 +359,9 @@ int main(int argc, char* argv[])
     SetConsoleCP(CP_UTF8);
 #endif
 
-	std::string outputPath = R"(Gdansk\output.txt)";
-	std::string outputCsvPath = R"(Gdansk\output.csv)";
-	std::string inputPath = R"(Gdansk\input.txt)";
+	std::string outputPath = R"(TEST_GZM\output.txt)";
+	std::string outputCsvPath = R"(TEST_GZM\output.csv)";
+	std::string inputPath = R"(GZM\input.txt)";
 
 	std::ifstream inputFile(inputPath);
     if (!inputFile.is_open())
@@ -382,8 +382,8 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    //auto network = NetworkLoaderGZM::load(".\\GZM");
-    auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
+    auto network = NetworkLoaderGZM::load(".\\GZM");
+    //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
 
     GeneticAlgorithm genAlg;
     ACOAlgorithm acoAlg;
@@ -468,21 +468,21 @@ int main(int argc, char* argv[])
                 if (el.isValid())
                     outputCsvFile << experiment << ",GEN," << i << ",1," << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tGen.count() << '\n';
                 else
-                    outputCsvFile << experiment << ",GEN," << i << ",0,0,0,0,0,0\n";
+                    outputCsvFile << experiment << ",GEN," << i << ",0,0,0,0,0," << tGen.count() << '\n';
             }
             for (const auto& el : resAco)
             {
                 if (el.isValid())
                     outputCsvFile << experiment << ",ACO," << i << ",1," << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tAco.count() << '\n';
                 else
-                    outputCsvFile << experiment << ",ACO," << i << ",0,0,0,0,0,0\n";
+                    outputCsvFile << experiment << ",ACO," << i << ",0,0,0,0,0," << tAco.count() << '\n';
             }
             for (const auto& el : resPso)
             {
                 if (el.isValid())
                     outputCsvFile << experiment << ",PSO," << i << ",1," << el.getArrivalTime().count() << ',' << el.getTravelTime().count() << ',' << el.getWaitingTime().count() << ',' << el.getTransfers() << ',' << tPso.count() << '\n';
                 else
-                    outputCsvFile << experiment << ",PSO," << i << ",0,0,0,0,0,0\n";
+                    outputCsvFile << experiment << ",PSO," << i << ",0,0,0,0,0," << tPso.count() << '\n';
             }
 
             genResults.emplace_back(resGen, tGen);
