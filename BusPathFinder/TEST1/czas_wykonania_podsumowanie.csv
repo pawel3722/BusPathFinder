@@ -1,0 +1,4 @@
+algorytm,sredni_czas_ms,mediana_czasu_ms,odchylenie_czasu_ms,min_czas_ms,max_czas_ms
+GEN,2884.9,2760.0,402.3042431812429,2376,3951
+ACO,7755.78,8139.0,2215.8747320557773,4367,13143
+PSO,4274.62,4447.5,1142.1663606980396,2644,6234

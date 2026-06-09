@@ -10,10 +10,10 @@
 
 #define ANT_COUNT 100
 #define ITERATIONS 100
-#define MAX_PATH_LENGTH 70
+#define MAX_PATH_LENGTH 50
 
-#define ALPHA 1.0
-#define BETA 1.0
+#define ALPHA 0.7
+#define BETA 0.3
 #define EVAPORATION 0.15
 
 #define MIN_TRANSFER_DURATION 3

@@ -234,7 +234,8 @@ Network NetworkLoaderZG::load(
             int platformId = std::stoi(getRequired(row, header, "stop_id"));
 
             std::string stopName = getRequired(row, header, "stop_name");
-            std::transform(stopName.begin(), stopName.end(), stopName.begin(),
+            std::string stopNameKey = stopName;
+            std::transform(stopNameKey.begin(), stopNameKey.end(), stopNameKey.begin(),
                 [](unsigned char c) { return std::tolower(c); });
 
             double lat = std::stod(getRequired(row, header, "stop_lat"));
@@ -242,7 +243,7 @@ Network NetworkLoaderZG::load(
 
             int zone = 0;
 
-            auto& group = groupedStops[stopName];
+            auto& group = groupedStops[stopNameKey];
 
             if (group.count == 0)
             {

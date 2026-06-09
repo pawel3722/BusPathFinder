@@ -1,0 +1,110 @@
+>>>>>>>>>>Experiment: 0 TRIP FROM: Poznańska <1529> TO: Pruszcz Gdański Powstańców Warszawy/Plater <14598> AT: 11:16 <<<<<<<<<<
+++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 13:07        max: 15:07        avg: 13:38        std dev: 00:37        
+Travel time:        min: 01:49        max: 03:49        avg: 02:16        std dev: 00:38        
+Waiting time:       min: 00:20        max: 02:02        avg: 00:39        std dev: 00:34        
+Transfers:          min: 2            max: 2            avg: 2.00         std dev: 0.00         
+Pareto size:        min: 1            max: 6            avg: 3.00         std dev: 2.07         
+Computation time:   min: 1856ms       max: 2319ms       avg: 2145.14ms    std dev: 157.87ms     
+++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 13:07        max: 17:17        avg: 14:36        std dev: 01:30        
+Travel time:        min: 01:49        max: 04:51        avg: 02:43        std dev: 01:05        
+Waiting time:       min: 00:20        max: 03:20        avg: 01:21        std dev: 01:04        
+Transfers:          min: 4            max: 5            avg: 4.14         std dev: 0.35         
+Pareto size:        min: 1            max: 2            avg: 1.14         std dev: 0.35         
+Computation time:   min: 6381ms       max: 8096ms       avg: 7308.00ms    std dev: 512.08ms     
+++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 13:07        max: 19:00        avg: 14:25        std dev: 02:18        
+Travel time:        min: 01:37        max: 07:42        avg: 03:00        std dev: 02:21        
+Waiting time:       min: 00:27        max: 06:24        avg: 01:43        std dev: 02:21        
+Transfers:          min: 2            max: 4            avg: 3.00         std dev: 0.63         
+Pareto size:        min: 1            max: 3            avg: 2.20         std dev: 0.75         
+Computation time:   min: 3512ms       max: 4628ms       avg: 4118.60ms    std dev: 415.08ms     
+>>>>>>>>>>Experiment: 1 TRIP FROM: Sobieszewko <1952> TO: Plac Komorowskiego <1011> AT: 10:49 <<<<<<<<<<
+++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 12:14        max: 12:14        avg: 12:14        std dev: 00:00        
+Travel time:        min: 01:09        max: 01:09        avg: 01:09        std dev: 00:00        
+Waiting time:       min: 00:12        max: 00:12        avg: 00:12        std dev: 00:00        
+Transfers:          min: 2            max: 2            avg: 2.00         std dev: 0.00         
+Pareto size:        min: 1            max: 1            avg: 1.00         std dev: 0.00         
+Computation time:   min: 2496ms       max: 3329ms       avg: 2836.90ms    std dev: 224.18ms     
+++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 12:14        max: 12:14        avg: 12:14        std dev: 00:00        
+Travel time:        min: 01:06        max: 01:09        avg: 01:08        std dev: 00:01        
+Waiting time:       min: 00:08        max: 00:12        avg: 00:10        std dev: 00:02        
+Transfers:          min: 2            max: 2            avg: 2.00         std dev: 0.00         
+Pareto size:        min: 1            max: 2            avg: 1.70         std dev: 0.46         
+Computation time:   min: 4687ms       max: 5475ms       avg: 4950.30ms    std dev: 228.86ms     
+++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 12:14        max: 12:14        avg: 12:14        std dev: 00:00        
+Travel time:        min: 01:06        max: 01:09        avg: 01:09        std dev: 00:01        
+Waiting time:       min: 00:09        max: 00:12        avg: 00:12        std dev: 00:01        
+Transfers:          min: 2            max: 2            avg: 2.00         std dev: 0.00         
+Pareto size:        min: 1            max: 2            avg: 1.10         std dev: 0.30         
+Computation time:   min: 2758ms       max: 3297ms       avg: 2954.30ms    std dev: 156.08ms     
+>>>>>>>>>>Experiment: 2 TRIP FROM: Platynowa <1231> TO: Komary <1940> AT: 10:48 <<<<<<<<<<
+++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 12:58        max: 14:43        avg: 13:31        std dev: 00:43        
+Travel time:        min: 01:12        max: 01:36        avg: 01:23        std dev: 00:11        
+Waiting time:       min: 00:09        max: 00:16        avg: 00:12        std dev: 00:03        
+Transfers:          min: 2            max: 2            avg: 2.00         std dev: 0.00         
+Pareto size:        min: 2            max: 4            avg: 2.60         std dev: 0.80         
+Computation time:   min: 2269ms       max: 2750ms       avg: 2499.20ms    std dev: 176.03ms     
+++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 13:58        max: 17:27        avg: 16:18        std dev: 01:18        
+Travel time:        min: 02:47        max: 06:34        avg: 05:12        std dev: 01:18        
+Waiting time:       min: 01:41        max: 05:28        avg: 04:06        std dev: 01:18        
+Transfers:          min: 2            max: 4            avg: 3.20         std dev: 0.75         
+Pareto size:        min: 1            max: 1            avg: 1.00         std dev: 0.00         
+Computation time:   min: 7976ms       max: 8590ms       avg: 8219.80ms    std dev: 244.49ms     
+++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 15:53        max: 15:53        avg: 15:53        std dev: 00:00        
+Travel time:        min: 04:46        max: 05:00        avg: 04:53        std dev: 00:07        
+Waiting time:       min: 03:39        max: 03:51        avg: 03:45        std dev: 00:06        
+Transfers:          min: 2            max: 3            avg: 2.50         std dev: 0.50         
+Pareto size:        min: 1            max: 2            avg: 1.50         std dev: 0.50         
+Computation time:   min: 3154ms       max: 3605ms       avg: 3379.50ms    std dev: 225.50ms     
+>>>>>>>>>>Experiment: 3 TRIP FROM: Soplicy <1118> TO: Forsycji <1827> AT: 17:08 <<<<<<<<<<
+++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 18:35        max: 25:37        avg: 19:47        std dev: 02:26        
+Travel time:        min: 01:23        max: 06:19        avg: 02:17        std dev: 01:48        
+Waiting time:       min: 00:07        max: 04:45        avg: 01:03        std dev: 01:43        
+Transfers:          min: 2            max: 2            avg: 2.00         std dev: 0.00         
+Pareto size:        min: 1            max: 6            avg: 2.70         std dev: 1.95         
+Computation time:   min: 1871ms       max: 3245ms       avg: 2296.00ms    std dev: 431.99ms     
+++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 18:35        max: 18:35        avg: 18:35        std dev: 00:00        
+Travel time:        min: 01:20        max: 01:23        avg: 01:23        std dev: 00:01        
+Waiting time:       min: 00:11        max: 00:15        avg: 00:14        std dev: 00:01        
+Transfers:          min: 2            max: 2            avg: 2.00         std dev: 0.00         
+Pareto size:        min: 1            max: 2            avg: 1.80         std dev: 0.40         
+Computation time:   min: 7778ms       max: 10046ms      avg: 8673.10ms    std dev: 823.95ms     
+++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 18:35        max: 19:15        avg: 18:47        std dev: 00:18        
+Travel time:        min: 01:23        max: 01:43        avg: 01:29        std dev: 00:09        
+Waiting time:       min: 00:11        max: 00:37        avg: 00:20        std dev: 00:11        
+Transfers:          min: 2            max: 3            avg: 2.10         std dev: 0.30         
+Pareto size:        min: 3            max: 8            avg: 4.70         std dev: 1.55         
+Computation time:   min: 3374ms       max: 5142ms       avg: 3957.20ms    std dev: 547.11ms     
+>>>>>>>>>>Experiment: 4 TRIP FROM: Jodowa <1174> TO: Zakopiańska <1262> AT: 14:00 <<<<<<<<<<
+++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 14:52        max: 14:57        avg: 14:56        std dev: 00:02        
+Travel time:        min: 00:51        max: 00:56        avg: 00:55        std dev: 00:02        
+Waiting time:       min: 00:04        max: 00:09        avg: 00:07        std dev: 00:02        
+Transfers:          min: 1            max: 1            avg: 1.00         std dev: 0.00         
+Pareto size:        min: 1            max: 3            avg: 1.40         std dev: 0.66         
+Computation time:   min: 2443ms       max: 3860ms       avg: 3251.10ms    std dev: 444.77ms     
+++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 14:52        max: 14:52        avg: 14:52        std dev: 00:00        
+Travel time:        min: 00:50        max: 00:51        avg: 00:50        std dev: 00:00        
+Waiting time:       min: 00:03        max: 00:04        avg: 00:04        std dev: 00:00        
+Transfers:          min: 1            max: 1            avg: 1.00         std dev: 0.00         
+Pareto size:        min: 1            max: 2            avg: 1.80         std dev: 0.40         
+Computation time:   min: 3757ms       max: 4950ms       avg: 4346.70ms    std dev: 374.90ms     
+++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++
+Arrival time:       min: 14:52        max: 16:24        avg: 15:05        std dev: 00:27        
+Travel time:        min: 00:50        max: 00:51        avg: 00:50        std dev: 00:00        
+Waiting time:       min: 00:02        max: 00:06        avg: 00:04        std dev: 00:01        
+Transfers:          min: 1            max: 1            avg: 1.00         std dev: 0.00         
+Pareto size:        min: 1            max: 3            avg: 2.00         std dev: 0.63         
+Computation time:   min: 2289ms       max: 2717ms       avg: 2526.00ms    std dev: 142.27ms     

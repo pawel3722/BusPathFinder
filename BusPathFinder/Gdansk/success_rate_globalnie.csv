@@ -1,0 +1,4 @@
+algorytm,liczba_uruchomien,liczba_poprawnych,success_rate,success_rate_%
+ACO,50,42,0.84,84.0
+GEN,50,49,0.98,98.0
+PSO,50,35,0.7,70.0
