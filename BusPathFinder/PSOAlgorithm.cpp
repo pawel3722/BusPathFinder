@@ -489,6 +489,11 @@ static void followPath(Particle& particle, const Particle&leader, const std::vec
         if (particle.path[i].to->getStop() == targetStop->getStop() 
          && particle.path[i].to->getTime() < targetStop->getTime())
         {
+			if (particle.path[i].to->getTrip()->getJobId() != targetStop->getTrip()->getJobId()
+			 && particle.path[i].to->getTime() + std::chrono::minutes(MIN_TRANSFER_DURATION) > targetStop->getTime())
+				continue;
+
+
             currentIndex = i;
             break;
         }

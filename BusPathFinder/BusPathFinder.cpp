@@ -15,7 +15,7 @@
 #include "PSOAlgorithm.h"
 #include "Result.h"
 
-int main2()
+int main()
 {
     #ifdef _WIN32
         SetConsoleOutputCP(CP_UTF8);
@@ -353,7 +353,7 @@ void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header
 }
 
 
-int main(int argc, char* argv[])
+int main1(int argc, char* argv[])
 {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
