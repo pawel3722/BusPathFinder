@@ -1,64 +1,53 @@
 #include <unordered_map>
-#include <vector>
 #include <random>
 #include <algorithm>
 #include <unordered_set>
 #include <array>
+#include <fstream>
 
 #include "ACOAlgorithm.h"
 #include "Functions.h"
 
-#define ANT_COUNT 100
-#define ITERATIONS 100
-#define MAX_PATH_LENGTH 50
-
-#define ALPHA 0.7
-#define BETA 0.3
-#define EVAPORATION 0.15
-
-#define MIN_TRANSFER_DURATION 3
-#define MAX_DEPARTURES_PER_ROUTE 5
-#define SAME_TRIP_PROB 0.95
-
-enum Objective
+ACOAlgorithm::ACOAlgorithm(const std::string& configFilePath)
 {
-    ARRIVAL,
-    TRAVEL,
-    WAITING,
-    TRANSFERS,
-    COST 
-};
+    std::ifstream file(configFilePath);
 
-struct Ant
-{
-    std::vector<ConnectionTime> path;
+    if (!file)
+        throw std::runtime_error("Cannot open config file: " + configFilePath);
 
-    bool isValid = false;
+    std::unordered_map<std::string, std::string> params;
 
-    Objective objective;
-
-    std::chrono::minutes arrivalTime = std::chrono::minutes::max();
-    std::chrono::minutes travelTime = std::chrono::minutes::max();
-    std::chrono::minutes waitingTime = std::chrono::minutes(0);
-
-    double cost = 0.0;
-    double distanceToGoal = 1e9;
-
-    int transfers = 0;
-};
-
-struct ConnectionTimeHash
-{
-    size_t operator()(const ConnectionTime& c) const
+    std::string line;
+    while (std::getline(file, line))
     {
-        size_t h1 = std::hash<const void*>()(c.from);
-        size_t h2 = std::hash<const void*>()(c.to);
+        if (line.empty() || line[0] == '#')
+            continue;
 
-        return h1 ^ (h2 << 1);
+        auto pos = line.find('=');
+        if (pos == std::string::npos)
+            continue;
+
+        std::string key = line.substr(0, pos);
+        std::string value = line.substr(pos + 1);
+
+        params[key] = value;
     }
-};
 
-static bool dominates(const Ant& a, const Ant& b)
+    ANT_COUNT = std::stoi(params.at("ANT_COUNT"));
+    ITERATIONS = std::stoi(params.at("ITERATIONS"));
+    MAX_PATH_LENGTH = std::stoi(params.at("MAX_PATH_LENGTH"));
+
+    MIN_TRANSFER_TIME = std::stoi(params.at("MIN_TRANSFER_TIME"));
+    MAX_DEPARTURES_PER_ROUTE = std::stoi(params.at("MAX_DEPARTURES_PER_ROUTE"));
+    SAME_TRIP_PROB = std::stod(params.at("SAME_TRIP_PROB"));
+
+    ALPHA = std::stod(params.at("ALPHA"));
+    BETA = std::stod(params.at("BETA"));
+    EVAPORATION = std::stod(params.at("EVAPORATION"));
+    EPSILON = std::stod(params.at("EPSILON"));
+}
+
+bool ACOAlgorithm::dominates(const Ant& a, const Ant& b)
 {
     if (b.path.empty())
         return true;
@@ -66,23 +55,16 @@ static bool dominates(const Ant& a, const Ant& b)
     if (!b.isValid)
         return a.isValid;
 
-    if (!a.isValid || a.arrivalTime > b.arrivalTime || a.travelTime > b.travelTime || a.waitingTime > b.waitingTime || a.cost > b.cost || a.transfers > b.transfers)
+    if (!a.isValid || a.arrivalTime > b.arrivalTime || a.travelTime > b.travelTime || a.waitingTime > b.waitingTime || a.transfers > b.transfers)
         return false;
 
-    if (a.arrivalTime < b.arrivalTime || a.travelTime < b.travelTime || a.waitingTime < b.waitingTime || a.cost < b.cost || a.transfers < b.transfers)
+    if (a.arrivalTime < b.arrivalTime || a.travelTime < b.travelTime || a.waitingTime < b.waitingTime || a.transfers < b.transfers)
         return true;
 
     return false;
 }
 
-static double calculateCost(const ConnectionTime& connection)
-{
-    auto duration = connection.to->getTime() - connection.from->getTime();
-
-    return 0.00;//duration.count() * 0.15;
-}
-
-static std::vector<Trip*> buildTripSequence(const Ant& ant)
+std::vector<Trip*> ACOAlgorithm::buildTripSequence(const Ant& ant)
 {
     std::vector<Trip*> trips;
 
@@ -102,7 +84,7 @@ static std::vector<Trip*> buildTripSequence(const Ant& ant)
     return trips;
 }
 
-static double pathSimilarity(const Ant& a, const Ant& b)
+double ACOAlgorithm::pathSimilarity(const Ant& a, const Ant& b)
 {
     auto tripsA = buildTripSequence(a);
     auto tripsB = buildTripSequence(b);
@@ -122,7 +104,7 @@ static double pathSimilarity(const Ant& a, const Ant& b)
         std::max(tripsA.size(), tripsB.size());
 }
 
-static double getPheromone(const std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones,
+double ACOAlgorithm::getPheromone(const std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones,
     Objective objective,
     const ConnectionTime& edge)
 {
@@ -134,7 +116,7 @@ static double getPheromone(const std::array<std::unordered_map<ConnectionTime, d
     return it->second;
 }
 
-static double heuristicValue(Objective objective,
+double ACOAlgorithm::heuristicValue(Objective objective,
     StopTime* dep,
     const Stop* end,
     std::chrono::minutes arrival,
@@ -150,13 +132,10 @@ static double heuristicValue(Objective objective,
     {
     case ARRIVAL:
     case TRAVEL:
-        return exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_DURATION));
+        return exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_TIME));
 
     case WAITING:
-        return exp(progress) * exp(-0.3 * (wait - MIN_TRANSFER_DURATION));
-
-    case COST:
-        return 1.0 / (calculateCost({ dep, dep->getNextStopTime() }) + 1.0);
+        return exp(progress) * exp(-0.3 * (wait - MIN_TRANSFER_TIME));
 
     case TRANSFERS:
         return transfer ? 0.2 : 3.0;
@@ -165,7 +144,7 @@ static double heuristicValue(Objective objective,
     return 1.0;
 }
 
-static StopTime* chooseNextDeparture(
+StopTime* ACOAlgorithm::chooseNextDeparture(
     const std::vector<StopTime*>& departureOptions,
     const Stop* end,
     std::chrono::minutes arrival,
@@ -174,9 +153,7 @@ static StopTime* chooseNextDeparture(
     const std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones)
 {
 
-    double epsilon = 0.1;
-
-    if (randomDouble(0.0, 1.0) < epsilon)
+    if (randomDouble(0.0, 1.0) < EPSILON)
     {
         return departureOptions[randomInt(0, departureOptions.size() - 1)];
     }
@@ -219,7 +196,7 @@ static StopTime* chooseNextDeparture(
     return departureOptions.back();
 }
 
-static Ant buildAnt(
+Ant ACOAlgorithm::buildAnt(
     const Network& network,
     const Stop* start,
     const Stop* end,
@@ -253,7 +230,7 @@ static Ant buildAnt(
         auto departures = network.getStopTimes(next->getStop(),
             next->getTime(),
             next->getTrip(),
-            MIN_TRANSFER_DURATION,
+            MIN_TRANSFER_TIME,
             MAX_DEPARTURES_PER_ROUTE);
 
         if (departures.empty())
@@ -297,7 +274,7 @@ static Ant buildAnt(
     return ant;
 }
 
-static void evaluateAnt(Ant& ant,
+void ACOAlgorithm::evaluateAnt(Ant& ant,
     std::chrono::minutes departureTime,
     const Stop* end)
 {
@@ -329,7 +306,6 @@ static void evaluateAnt(Ant& ant,
     ant.waitingTime = std::chrono::minutes(0);
 
     ant.transfers = 0;
-    ant.cost = 0.0;
 
     Trip* previousTrip = nullptr;
     auto arrival = departureTime;
@@ -348,14 +324,12 @@ static void evaluateAnt(Ant& ant,
                 ant.waitingTime += wait;
         }
 
-        ant.cost += calculateCost(edge);
-
         previousTrip = trip;
         arrival = edge.to->getTime();
     }
 }
 
-static void evaporate(
+void ACOAlgorithm::evaporate(
     std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones)
 {
     for (int obj = 0; obj < 5; obj++)
@@ -369,8 +343,7 @@ static void evaporate(
     }
 }
 
-static void updateParetoArchive(std::vector<Ant>& archive,
-    const Ant& candidate)
+void ACOAlgorithm::updateParetoArchive(std::vector<Ant>& archive, const Ant& candidate)
 {
     if (candidate.path.empty())
         return;
@@ -403,7 +376,7 @@ static void updateParetoArchive(std::vector<Ant>& archive,
     }
 }
 
-static void reinforce(
+void ACOAlgorithm::reinforce(
     const std::vector<Ant>& archive,
     std::array<std::unordered_map<ConnectionTime, double, ConnectionTimeHash>, 5>& pheromones,
     std::chrono::minutes departureReference)
@@ -446,14 +419,6 @@ static void reinforce(
                 break;
             }
 
-            case COST:
-            {
-                reward += 10000.0 /
-                    (ant.cost + 1.0);
-
-                break;
-            }
-
             case TRANSFERS:
             {
                 reward += 10000.0 /
@@ -473,14 +438,13 @@ static void reinforce(
     }
 }
 
-static std::vector<Ant> selectBestRoutes(const std::vector<Ant>& archive)
+std::vector<Ant> ACOAlgorithm::selectBestRoutes(const std::vector<Ant>& archive)
 {
     std::vector<Ant> result;
 
     const Ant* bestArrival = nullptr;
     const Ant* bestTravel = nullptr;
     const Ant* bestWaiting = nullptr;
-    const Ant* bestCost = nullptr;
     const Ant* bestTransfers = nullptr;
 
     for (const auto& ant : archive)
@@ -496,9 +460,6 @@ static std::vector<Ant> selectBestRoutes(const std::vector<Ant>& archive)
 
         if (!bestWaiting || ant.waitingTime < bestWaiting->waitingTime)
             bestWaiting = &ant;
-
-        if (!bestCost || ant.cost < bestCost->cost)
-            bestCost = &ant;
 
         if (!bestTransfers || ant.transfers < bestTransfers->transfers)
             bestTransfers = &ant;
@@ -521,7 +482,6 @@ static std::vector<Ant> selectBestRoutes(const std::vector<Ant>& archive)
     add(bestArrival);
     add(bestTravel);
     add(bestWaiting);
-    add(bestCost);
     add(bestTransfers);
 
     return result;
@@ -584,7 +544,6 @@ std::vector<Path> ACOAlgorithm::findPath(
             ant.arrivalTime,
             ant.travelTime,
             ant.waitingTime,
-            ant.cost,
             ant.transfers));
     }
 

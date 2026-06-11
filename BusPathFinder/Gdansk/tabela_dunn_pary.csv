@@ -1,4 +1,4 @@
 Porównanie,p,Wniosek
-GEN vs ACO,0.11964,brak istotności
-GEN vs PSO,0.037601,istotna różnica
+GEN vs ACO,2e-06,istotna różnica
+GEN vs PSO,0.000144,istotna różnica
 ACO vs PSO,1.0,brak istotności

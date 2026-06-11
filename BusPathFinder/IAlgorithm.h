@@ -2,6 +2,14 @@
 #include "Network.h"
 #include "Path.h"
 
+enum Objective
+{
+    ARRIVAL,
+    TRAVEL,
+    WAITING,
+    TRANSFERS,
+};
+
 class IAlgorithm
 {
 public:

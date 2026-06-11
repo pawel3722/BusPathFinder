@@ -97,46 +97,60 @@ print(success_global)
 
 # =========================
 # HYPERVOLUME
+# normalizacja osobno dla każdego eksperymentu
 # =========================
 
 results = []
 
-valid = df[df["czy_poprawny"] == 1].copy()
-
-if valid.empty:
-    raise ValueError("Brak poprawnych rozwiązań w pliku.")
-
-# normalizacja globalna na podstawie wszystkich poprawnych rozwiązań
-mins = valid[objectives].min()
-maxs = valid[objectives].max()
-ranges = (maxs - mins).replace(0, 1)
-
 ref_point = np.array([1.1] * len(objectives))
-hv_indicator = HV(ref_point=ref_point)
 
-# iterujemy po wszystkich uruchomieniach, także niepoprawnych
-for (exp, alg, run), group in df.groupby(["nr_eksperymentu", "algorytm", "nr_iteracji"]):
+for exp, exp_df in df.groupby("nr_eksperymentu"):
 
-    group_valid = group[group["czy_poprawny"] == 1].copy()
+    exp_valid = exp_df[exp_df["czy_poprawny"] == 1].copy()
 
-    if group_valid.empty:
-        hv_value = 0.0
-        pareto_size = 0
-    else:
-        group_valid[objectives] = (group_valid[objectives] - mins) / ranges
-        points = group_valid[objectives].to_numpy()
+    if exp_valid.empty:
+        # jeśli w całym eksperymencie nie ma żadnego poprawnego rozwiązania
+        for (alg, run), group in exp_df.groupby(["algorytm", "nr_iteracji"]):
+            results.append({
+                "nr_eksperymentu": exp,
+                "algorytm": alg,
+                "nr_iteracji": run,
+                "HV": 0.0,
+                "liczba_rozwiazan_pareto": 0
+            })
+        continue
 
-        pareto_points = remove_dominated(points)
-        hv_value = hv_indicator(pareto_points)
-        pareto_size = len(pareto_points)
+    # normalizacja min-max tylko w ramach danego eksperymentu
+    mins = exp_valid[objectives].min()
+    maxs = exp_valid[objectives].max()
+    ranges = (maxs - mins).replace(0, 1)
 
-    results.append({
-        "nr_eksperymentu": exp,
-        "algorytm": alg,
-        "nr_iteracji": run,
-        "HV": hv_value,
-        "liczba_rozwiazan_pareto": pareto_size
-    })
+    hv_indicator = HV(ref_point=ref_point)
+
+    # iterujemy po wszystkich uruchomieniach w danym eksperymencie,
+    # także po tych, gdzie nie znaleziono rozwiązania
+    for (alg, run), group in exp_df.groupby(["algorytm", "nr_iteracji"]):
+
+        group_valid = group[group["czy_poprawny"] == 1].copy()
+
+        if group_valid.empty:
+            hv_value = 0.0
+            pareto_size = 0
+        else:
+            group_valid[objectives] = (group_valid[objectives] - mins) / ranges
+            points = group_valid[objectives].to_numpy()
+
+            pareto_points = remove_dominated(points)
+            hv_value = hv_indicator(pareto_points)
+            pareto_size = len(pareto_points)
+
+        results.append({
+            "nr_eksperymentu": exp,
+            "algorytm": alg,
+            "nr_iteracji": run,
+            "HV": hv_value,
+            "liczba_rozwiazan_pareto": pareto_size
+        })
 
 hv_df = pd.DataFrame(results)
 

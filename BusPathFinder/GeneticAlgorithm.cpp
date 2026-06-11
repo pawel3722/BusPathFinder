@@ -1,46 +1,50 @@
 #include <random>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 
 #include "GeneticAlgorithm.h"
 #include "Functions.h"
 
-
-#define POPULATION 100
-#define GENERATIONS 100
-#define MAX_PATH_LENGTH 50
-
-#define MIN_TRANSFER_DURATION 3
-#define MAX_DEPARTURES_PER_ROUTE 3
-#define SAME_TRIP_PROB 0.95
-
-#define RANDOM_MUTATION_PROB 0.3
-#define WAITING_MUTATION_PROB 0.6
-#define TRANSFER_MUTATION_PROB 0.4
-
-
-struct Individual
+GeneticAlgorithm::GeneticAlgorithm(const std::string& configFilePath)
 {
-    std::vector<ConnectionTime> genes;
-    bool isValid = false;
+    std::ifstream file(configFilePath);
 
-    // funkcje celu
-    std::chrono::minutes arrivalTime = std::chrono::minutes(0);
-    std::chrono::minutes travelTime = std::chrono::minutes(0);
-    std::chrono::minutes waitingTime = std::chrono::minutes(0);
-    double cost = 0.0;
-    int transfers = 0;
+    if (!file)
+        throw std::runtime_error("Cannot open config file: " + configFilePath);
 
-    // NSGA-II
-    int rank = 0;
-    double crowdingDistance = 0.0;
+    std::unordered_map<std::string, std::string> params;
 
-    // pomocnicze
-    int dominationCount = 0;
-    std::vector<int> dominated = {};
-};
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (line.empty() || line[0] == '#')
+            continue;
 
-static StopTime* chooseNextDeparture(
+        auto pos = line.find('=');
+        if (pos == std::string::npos)
+            continue;
+
+        std::string key = line.substr(0, pos);
+        std::string value = line.substr(pos + 1);
+
+        params[key] = value;
+    }
+
+    POPULATION = std::stoi(params.at("POPULATION"));
+    GENERATIONS = std::stoi(params.at("GENERATIONS"));
+    MAX_PATH_LENGTH = std::stoi(params.at("MAX_PATH_LENGTH"));
+
+    MIN_TRANSFER_TIME = std::stoi(params.at("MIN_TRANSFER_TIME"));
+    MAX_DEPARTURES_PER_ROUTE = std::stoi(params.at("MAX_DEPARTURES_PER_ROUTE"));
+    SAME_TRIP_PROB = std::stod(params.at("SAME_TRIP_PROB"));
+
+    RANDOM_MUTATION_PROB = std::stod(params.at("RANDOM_MUTATION_PROB"));
+    WAITING_MUTATION_PROB = std::stod(params.at("WAITING_MUTATION_PROB"));
+    TRANSFER_MUTATION_PROB = std::stod(params.at("TRANSFER_MUTATION_PROB"));
+}
+
+StopTime* GeneticAlgorithm::chooseNextDeparture(
     std::vector<StopTime*> departureOptions,
     const Stop* end,
     std::chrono::minutes arrival)
@@ -65,7 +69,7 @@ static StopTime* chooseNextDeparture(
         double wait = (dep->getTime().count() - arrival.count()) * 1.0;
 
         double noise = randomDouble(0.85, 1.15);
-        double weight = noise * exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_DURATION));
+        double weight = noise * exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_TIME));
 
         weights.push_back(weight);
         weightSum += weight;
@@ -85,7 +89,7 @@ static StopTime* chooseNextDeparture(
     return departureOptions.back();
 }
 
-static double heuristicToGoal(const Individual& ind, const Stop* end)
+double GeneticAlgorithm::heuristicToGoal(const Individual& ind, const Stop* end)
 {
     if (ind.genes.empty())
         return 1e9;
@@ -96,18 +100,18 @@ static double heuristicToGoal(const Individual& ind, const Stop* end)
     return geoDistance(current, end);
 }
 
-static bool dominates(const Individual& a, const Individual& b)
+bool GeneticAlgorithm::dominates(const Individual& a, const Individual& b)
 {
-    if (a.arrivalTime > b.arrivalTime || a.travelTime > b.travelTime || a.waitingTime > b.waitingTime || a.cost > b.cost || a.transfers > b.transfers)
+    if (a.arrivalTime > b.arrivalTime || a.travelTime > b.travelTime || a.waitingTime > b.waitingTime || a.transfers > b.transfers)
         return false;
 
-    if (a.arrivalTime < b.arrivalTime || a.travelTime < b.travelTime || a.waitingTime < b.waitingTime || a.cost < b.cost || a.transfers < b.transfers)
+    if (a.arrivalTime < b.arrivalTime || a.travelTime < b.travelTime || a.waitingTime < b.waitingTime || a.transfers < b.transfers)
         return true;
 
     return false;
 }
 
-static void evaluateIndividual(Individual& individual, std::chrono::minutes departureTime, const Stop* targetStop)
+void GeneticAlgorithm::evaluateIndividual(Individual& individual, std::chrono::minutes departureTime, const Stop* targetStop)
 {
     individual.isValid =
         !individual.genes.empty() &&
@@ -118,7 +122,6 @@ static void evaluateIndividual(Individual& individual, std::chrono::minutes depa
         individual.arrivalTime = std::chrono::minutes::max() / 2;
         individual.travelTime = std::chrono::minutes::max() / 2;
         individual.waitingTime = std::chrono::minutes::max() / 2;
-        individual.cost = 1e9;
         individual.transfers = 1e9;
         return;
     }
@@ -127,11 +130,8 @@ static void evaluateIndividual(Individual& individual, std::chrono::minutes depa
     auto endTime = individual.genes.back().to->getTime();
 
     individual.arrivalTime = endTime;
-
     individual.travelTime = std::chrono::duration_cast<std::chrono::minutes>(endTime - startTime);
     individual.waitingTime = std::chrono::minutes(0);
-
-    individual.cost = 0.0;
     individual.transfers = 0;
 
     Trip* previousTrip = nullptr;
@@ -147,16 +147,12 @@ static void evaluateIndividual(Individual& individual, std::chrono::minutes depa
             individual.waitingTime += (connection.from->getTime() - arrival);
         }
 
-        // TODO:
-        // dodaj wyliczanie kosztu
-        // np. strefy + linia pospieszna
-
         previousTrip = trip;
         arrival = connection.to->getTime();
     }
 }
 
-static std::vector<std::vector<int>> nonDominatedSort(std::vector<Individual>& population)
+std::vector<std::vector<int>> GeneticAlgorithm::nonDominatedSort(std::vector<Individual>& population)
 {
     std::vector<std::vector<int>> fronts;
     std::vector<int> firstFront;
@@ -217,7 +213,7 @@ static std::vector<std::vector<int>> nonDominatedSort(std::vector<Individual>& p
     return fronts;
 }
 
-void computeCrowdingDistance(
+void GeneticAlgorithm::computeCrowdingDistance(
     std::vector<Individual>& population,
     const std::vector<int>& front)
 {
@@ -302,30 +298,6 @@ void computeCrowdingDistance(
         }
     }
 
-    // ===== KOSZT =====
-    std::sort(sorted.begin(), sorted.end(),
-        [&](int a, int b)
-        {
-            return population[a].cost < population[b].cost;
-        });
-
-    population[sorted.front()].crowdingDistance = INFINITY;
-    population[sorted.back()].crowdingDistance = INFINITY;
-
-    minVal = population[sorted.front()].cost;
-    maxVal = population[sorted.back()].cost;
-
-    if (maxVal > minVal)
-    {
-        for (int i = 1; i < sorted.size() - 1; i++)
-        {
-            population[sorted[i]].crowdingDistance +=
-                (population[sorted[i + 1]].cost -
-                    population[sorted[i - 1]].cost)
-                / (maxVal - minVal);
-        }
-    }
-
     // ===== PRZESIADKI =====
     std::sort(sorted.begin(), sorted.end(),
         [&](int a, int b)
@@ -351,7 +323,7 @@ void computeCrowdingDistance(
     }
 }
 
-const Individual& tournamentSelection(
+const Individual& GeneticAlgorithm::tournamentSelection(
     const std::vector<Individual>& population,
     const Stop* end)
 {
@@ -395,7 +367,7 @@ const Individual& tournamentSelection(
     return p2;
 }
 
-Individual crossover(
+Individual GeneticAlgorithm::crossover(
     const Individual& parent1,
     const Individual& parent2,
     const Stop* end)
@@ -421,7 +393,7 @@ Individual crossover(
             auto* stop2 = parent2.genes[j].to->getStop();
             auto time2 = parent2.genes[j].to->getTime();
 
-            if (stop1 != stop2 || time1.count() + MIN_TRANSFER_DURATION > time2.count())
+            if (stop1 != stop2 || time1.count() + MIN_TRANSFER_TIME > time2.count())
                 continue;
 
             auto diff = abs((time2 - time1).count());
@@ -505,7 +477,7 @@ Individual crossover(
     return child;
 }
 
-static bool fixWaitingTimes(Individual& individual,
+bool GeneticAlgorithm::fixWaitingTimes(Individual& individual,
     const Network& network)
 {
     
@@ -528,7 +500,7 @@ static bool fixWaitingTimes(Individual& individual,
     for (int i = static_cast<int>(transferPointDeps.size()) - 1; i >= 0; i--)
     {
         auto ed = network.getEarlierDeparture(transferPointDeps[i]);
-        if (ed == nullptr || transferPointArrs[i]->getTime().count() + MIN_TRANSFER_DURATION > ed->getTime().count())
+        if (ed == nullptr || transferPointArrs[i]->getTime().count() + MIN_TRANSFER_TIME > ed->getTime().count())
             continue;
         int maxIndex = i == transferPointDeps.size() - 1 ? individual.genes.size() : indices[i + 1];
         int minIndex = indices[i];
@@ -547,7 +519,7 @@ static bool fixWaitingTimes(Individual& individual,
     for (int i = 0; i < transferPointDeps.size(); i++)
     {
         auto la = network.getLaterDeparture(transferPointArrs[i]);
-        if (la == nullptr || la->getTime().count() + MIN_TRANSFER_DURATION > transferPointDeps[i]->getTime().count())
+        if (la == nullptr || la->getTime().count() + MIN_TRANSFER_TIME > transferPointDeps[i]->getTime().count())
             continue;
         int minIndex = i ? indices[i - 1] : 0;
         int maxIndex = indices[i];
@@ -565,7 +537,7 @@ static bool fixWaitingTimes(Individual& individual,
     return false;
 }
 
-static bool skipConnection(Individual& individual, const Network& network)
+bool GeneticAlgorithm::skipConnection(Individual& individual, const Network& network)
 {
     Trip* currentTrip = nullptr;
     std::vector<const StopTime*> tripEntryPoints;
@@ -618,7 +590,7 @@ static bool skipConnection(Individual& individual, const Network& network)
             if (index2 < 0 || index2 >= st2.size() - 1)
                 bool fail = true;
 
-            if (st1[index1]->getTime().count() + MIN_TRANSFER_DURATION > st2[index2]->getTime().count())
+            if (st1[index1]->getTime().count() + MIN_TRANSFER_TIME > st2[index2]->getTime().count())
                 continue;
 
             while (index2 + 1 < st2.size() && st2[index2]->getStop() != tripEntryPoints[j]->getStop())
@@ -638,7 +610,7 @@ static bool skipConnection(Individual& individual, const Network& network)
     return false;
 }
 
-static void mutate(
+void GeneticAlgorithm::mutate(
     Individual& individual,
     const Network& network,
     const Stop* end)
@@ -659,7 +631,7 @@ static void mutate(
             stopTime->getStop(),
             stopTime->getTime(),
             stopTime->getTrip(),
-            MIN_TRANSFER_DURATION,
+            MIN_TRANSFER_TIME,
             MAX_DEPARTURES_PER_ROUTE);
 
         if (departures.empty())
@@ -674,7 +646,7 @@ static void mutate(
     }
 }
 
-static std::string pathSignature(const Individual& individual)
+std::string GeneticAlgorithm::pathSignature(const Individual& individual)
 {
     std::string sig;
 
@@ -744,7 +716,7 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
                 break;
 
             //wez opcje kontynuacji podrozy z tego przystanku
-            auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime(), nextStopTime->getTrip(), MIN_TRANSFER_DURATION, MAX_DEPARTURES_PER_ROUTE);
+            auto departureOptions = network.getStopTimes(nextStopTime->getStop(), nextStopTime->getTime(), nextStopTime->getTrip(), MIN_TRANSFER_TIME, MAX_DEPARTURES_PER_ROUTE);
 
             visited.insert(currentStopTime->getStop());
             visited.insert(nextStopTime->getStop());
@@ -785,12 +757,6 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
         for (auto& individual : population)
         {
             evaluateIndividual(individual, departureTime, end);
-            //sprobuj opoznic rozpoczecie podrozy
-            /*if (individual.transfers > 0 && individual.isValid)
-            {
-                if(delayStart(individual, network));
-                    evaluateIndividual(individual, departureTime, end);
-            }*/
         }
 
         // sortowanie Pareto
@@ -916,7 +882,6 @@ std::vector<Path> GeneticAlgorithm::findPath(const Network& network, const Stop*
             el.arrivalTime,
             el.travelTime,
             el.waitingTime,
-            el.cost,
             el.transfers));
     }
 

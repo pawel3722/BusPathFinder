@@ -23,13 +23,13 @@ int main()
     #endif
 
 
-   auto network = NetworkLoaderZG::load(".\\ZielonaGora");
+   //auto network = NetworkLoaderZG::load(".\\ZielonaGora");
    //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
-   //auto network = NetworkLoaderGZM::load(".\\GZM");
+   auto network = NetworkLoaderGZM::load(".\\GZM");
 
-    GeneticAlgorithm genAlg;
-    ACOAlgorithm acoAlg;
-    PSOAlgorithm psoAlg;
+    GeneticAlgorithm genAlg("configGen.txt");
+    ACOAlgorithm acoAlg("configAco.txt");
+    PSOAlgorithm psoAlg("configPso.txt");
     RouteFinder genAlgRouteFinder(network, genAlg);
     RouteFinder acoAlgRouteFinder(network, acoAlg);
     RouteFinder psoAlgRouteFinder(network, psoAlg);
@@ -360,9 +360,9 @@ int main1(int argc, char* argv[])
     SetConsoleCP(CP_UTF8);
 #endif
 
-	std::string outputPath = R"(Gdansk\output.txt)";
-	std::string outputCsvPath = R"(Gdansk\output.csv)";
-	std::string inputPath = R"(Gdansk\input.txt)";
+	std::string outputPath = R"(GZM\output.txt)";
+	std::string outputCsvPath = R"(GZM\output.csv)";
+	std::string inputPath = R"(GZM\input.txt)";
 
 	std::ifstream inputFile(inputPath);
     if (!inputFile.is_open())
@@ -384,8 +384,8 @@ int main1(int argc, char* argv[])
     }
 
     //auto network = NetworkLoaderZG::load(".\\ZielonaGora");
-    //auto network = NetworkLoaderGZM::load(".\\GZM");
-    auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
+    auto network = NetworkLoaderGZM::load(".\\GZM");
+    //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
 
     GeneticAlgorithm genAlg;
     ACOAlgorithm acoAlg;

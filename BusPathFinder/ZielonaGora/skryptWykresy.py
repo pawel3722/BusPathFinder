@@ -3,6 +3,18 @@ import matplotlib.pyplot as plt
 from scipy.stats import kruskal
 import scikit_posthocs as sp
 
+def safe_kruskal(gen, aco, pso):
+    all_values = pd.concat([gen, aco, pso])
+
+    if all_values.nunique() <= 1:
+        return None, None, "wszystkie wartości identyczne"
+
+    if len(gen) < 2 or len(aco) < 2 or len(pso) < 2:
+        return None, None, "za mało danych"
+
+    stat, p = kruskal(gen, aco, pso)
+    return stat, p, "ok"
+
 # =========================
 # WCZYTANIE DANYCH
 # =========================
@@ -108,28 +120,26 @@ with open("tabela_hv_srednie.tex", "w", encoding="utf-8") as f:
 
 
 # =========================
-# 5. TABELA SUCCESS RATE DO LATEX
+# 5. TABELA SUCCESS RATE PER EKSPERYMENT DO LATEX
 # =========================
 
-success_table = success_global[[
-    "algorytm",
-    "liczba_uruchomien",
-    "liczba_poprawnych",
-    "success_rate_%"
-]].copy()
+success_exp_pivot = success_exp.pivot(
+    index="nr_eksperymentu",
+    columns="algorytm",
+    values="success_rate_%"
+)
 
-success_table["success_rate_%"] = success_table["success_rate_%"].round(2)
+success_exp_pivot = success_exp_pivot[alg_order]
+success_exp_pivot = success_exp_pivot.round(2)
 
-latex_success = success_table.to_latex(
-    index=False,
-    caption="Globalna skuteczność algorytmów.",
+latex_success = success_exp_pivot.to_latex(
+    caption="Skuteczność algorytmów dla poszczególnych eksperymentów [\\%].",
     label="tab:success_rate",
     float_format="%.2f"
 )
 
 with open("tabela_success_rate.tex", "w", encoding="utf-8") as f:
     f.write(latex_success)
-
 
 # =========================
 # 6. KRUSKAL-WALLIS GLOBALNIE
@@ -139,7 +149,12 @@ gen = hv[hv["algorytm"] == "GEN"]["HV"]
 aco = hv[hv["algorytm"] == "ACO"]["HV"]
 pso = hv[hv["algorytm"] == "PSO"]["HV"]
 
-stat, p = kruskal(gen, aco, pso)
+stat, p, status = safe_kruskal(gen, aco, pso)
+
+if status != "ok":
+    print(f"Test pominięty: {status}")
+else:
+    print(f"H = {stat:.4f}, p = {p:.6f}")
 
 kruskal_global = pd.DataFrame({
     "Test": ["Kruskal-Wallis globalnie"],
@@ -169,23 +184,22 @@ for exp_id, group in hv.groupby("nr_eksperymentu"):
     aco = group[group["algorytm"] == "ACO"]["HV"]
     pso = group[group["algorytm"] == "PSO"]["HV"]
 
-    if len(gen) < 2 or len(aco) < 2 or len(pso) < 2:
+    stat, p, status = safe_kruskal(gen, aco, pso)
+
+    if status != "ok":
         kruskal_rows.append({
             "Eksperyment": exp_id,
             "H": None,
             "p": None,
-            "Wniosek": "za mało danych"
+            "Wniosek": status
         })
-        continue
-
-    stat, p = kruskal(gen, aco, pso)
-
-    kruskal_rows.append({
-        "Eksperyment": exp_id,
-        "H": stat,
-        "p": p,
-        "Wniosek": "istotne" if p < 0.05 else "brak istotności"
-    })
+    else:
+        kruskal_rows.append({
+            "Eksperyment": exp_id,
+            "H": stat,
+            "p": p,
+            "Wniosek": "istotne" if p < 0.05 else "brak istotności"
+        })
 
 kruskal_exp = pd.DataFrame(kruskal_rows)
 

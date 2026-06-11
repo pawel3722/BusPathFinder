@@ -2,70 +2,64 @@
 #include <unordered_set>
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 
 #include "PSOAlgorithm.h"
 #include "Functions.h"
 
-#define SWARM_SIZE 100
-#define ITERATIONS 100
-#define MAX_PATH_LENGTH 50
-
-#define RANDOM_MUTATION_PROB 0.20
-#define PBEST_PROB 0.35
-#define GBEST_PROB 0.35
-
-#define MIN_TRANSFER_DURATION 3
-#define MAX_DEPARTURES_PER_ROUTE 3
-#define SAME_TRIP_PROB 0.95
-
-enum Objective
+PSOAlgorithm::PSOAlgorithm(const std::string& configFilePath)
 {
-    ARRIVAL,
-    TRAVEL,
-    WAITING,
-    TRANSFERS,
-    COST
-};
+    std::ifstream file(configFilePath);
 
-struct Particle
-{
-    std::vector<ConnectionTime> path;
-    std::vector<ConnectionTime> personalBest;
+    if (!file)
+        throw std::runtime_error("Cannot open config file: " + configFilePath);
 
-    bool isValid = false;
+    std::unordered_map<std::string, std::string> params;
 
-    Objective objective;
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (line.empty() || line[0] == '#')
+            continue;
 
-    std::chrono::minutes arrivalTime = std::chrono::minutes::max();
-    std::chrono::minutes travelTime = std::chrono::minutes::max();
-    std::chrono::minutes waitingTime = std::chrono::minutes(0);
+        auto pos = line.find('=');
+        if (pos == std::string::npos)
+            continue;
 
-    double cost = 0.0;
-    double distanceToGoal = 1e9;
+        std::string key = line.substr(0, pos);
+        std::string value = line.substr(pos + 1);
 
-    int transfers = 0;
-};
+        params[key] = value;
+    }
 
-static double calculateCost(const ConnectionTime& connection)
-{
-    return 0.0;
+    SWARM_SIZE = std::stoi(params.at("SWARM_SIZE"));
+    ITERATIONS = std::stoi(params.at("ITERATIONS"));
+    MAX_PATH_LENGTH = std::stoi(params.at("MAX_PATH_LENGTH"));
+
+    MIN_TRANSFER_TIME = std::stoi(params.at("MIN_TRANSFER_TIME"));
+    MAX_DEPARTURES_PER_ROUTE = std::stoi(params.at("MAX_DEPARTURES_PER_ROUTE"));
+    SAME_TRIP_PROB = std::stod(params.at("SAME_TRIP_PROB"));
+
+    RANDOM_MUTATION_PROB = std::stod(params.at("RANDOM_MUTATION_PROB"));
+    PBEST_PROB = std::stod(params.at("PBEST_PROB"));
+    GBEST_PROB = std::stod(params.at("GBEST_PROB"));
 }
 
-static bool dominates(const Particle& a, const Particle& b)
+bool PSOAlgorithm::dominates(const Particle& a, const Particle& b)
 {
     if (!b.isValid)
         return a.isValid;
 
-    if (!a.isValid || a.arrivalTime > b.arrivalTime || a.travelTime > b.travelTime || a.waitingTime > b.waitingTime || a.cost > b.cost || a.transfers > b.transfers)
+    if (!a.isValid || a.arrivalTime > b.arrivalTime || a.travelTime > b.travelTime || a.waitingTime > b.waitingTime || a.transfers > b.transfers)
         return false;
 
-    if (a.arrivalTime < b.arrivalTime || a.travelTime < b.travelTime || a.waitingTime < b.waitingTime || a.cost < b.cost || a.transfers < b.transfers)
+    if (a.arrivalTime < b.arrivalTime || a.travelTime < b.travelTime || a.waitingTime < b.waitingTime || a.transfers < b.transfers)
         return true;
 
     return false;
 }
 
-static std::vector<Trip*> buildTripSequence(const std::vector<ConnectionTime>& path)
+std::vector<Trip*> PSOAlgorithm::buildTripSequence(const std::vector<ConnectionTime>& path)
 {
     std::vector<Trip*> result;
     Trip* previous = nullptr;
@@ -84,7 +78,7 @@ static std::vector<Trip*> buildTripSequence(const std::vector<ConnectionTime>& p
     return result;
 }
 
-static double pathSimilarity(const Particle& a, const Particle& b)
+double PSOAlgorithm::pathSimilarity(const Particle& a, const Particle& b)
 {
     auto tripsA = buildTripSequence(a.path);
     auto tripsB = buildTripSequence(b.path);
@@ -105,7 +99,7 @@ static double pathSimilarity(const Particle& a, const Particle& b)
     return common * 1.0 / std::max(tripsA.size(), tripsB.size());
 }
 
-static double heuristicValue(Objective objective,
+double PSOAlgorithm::heuristicValue(Objective objective,
     StopTime* dep,
     const Stop* end,
     std::chrono::minutes arrival,
@@ -122,13 +116,10 @@ static double heuristicValue(Objective objective,
     {
     case ARRIVAL:
     case TRAVEL:
-        return exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_DURATION)) * transferPenalty;
+        return exp(progress) * exp(-0.1 * (wait - MIN_TRANSFER_TIME)) * transferPenalty;
 
     case WAITING:
-        return exp(progress) * exp(-0.3 * (wait - MIN_TRANSFER_DURATION)) * transferPenalty;
-
-    case COST:
-        return 1.0 / (calculateCost({ dep, dep->getNextStopTime() }) + 1.0);
+        return exp(progress) * exp(-0.3 * (wait - MIN_TRANSFER_TIME)) * transferPenalty;
 
     case TRANSFERS:
         return transfer ? 0.2 : 3.0;
@@ -137,20 +128,19 @@ static double heuristicValue(Objective objective,
     return 1.0;
 }
 
-static bool containsEdge(const std::vector<ConnectionTime>& path,
-    const ConnectionTime& edge)
+bool PSOAlgorithm::containsEdge(const std::vector<ConnectionTime>& path, const ConnectionTime& edge)
 {
     return std::find(path.begin(), path.end(), edge) != path.end();
 }
 
-static StopTime* chooseNextDeparture(
+StopTime* PSOAlgorithm::chooseNextDeparture(
     const std::vector<StopTime*>& departureOptions,
     const Stop* end,
     std::chrono::minutes arrival,
     StopTime* previous,
     Objective objective,
-    const std::vector<ConnectionTime>* pbest = nullptr,
-    const std::vector<ConnectionTime>* gbest = nullptr)
+    const std::vector<ConnectionTime>* pbest,
+    const std::vector<ConnectionTime>* gbest)
 {
 
     double epsilon = 0.1;
@@ -201,7 +191,7 @@ static StopTime* chooseNextDeparture(
     return departureOptions.back();
 }
 
-static Particle buildParticle(const Network& network, const Stop* start, const Stop* end, std::chrono::minutes departureTime)
+Particle PSOAlgorithm::buildParticle(const Network& network, const Stop* start, const Stop* end, std::chrono::minutes departureTime)
 {
     Particle particle;
 
@@ -227,7 +217,7 @@ static Particle buildParticle(const Network& network, const Stop* start, const S
     {
         visited.insert(current->getStop());
 
-        auto nextDepartures = network.getStopTimes(next->getStop(), next->getTime(), next->getTrip(), MIN_TRANSFER_DURATION, MAX_DEPARTURES_PER_ROUTE);
+        auto nextDepartures = network.getStopTimes(next->getStop(), next->getTime(), next->getTrip(), MIN_TRANSFER_TIME, MAX_DEPARTURES_PER_ROUTE);
 
         if (nextDepartures.empty())
             break;
@@ -270,7 +260,7 @@ static Particle buildParticle(const Network& network, const Stop* start, const S
     return particle;
 }
 
-static void evaluateParticle(Particle& particle, std::chrono::minutes departureTime, const Stop* end)
+void PSOAlgorithm::evaluateParticle(Particle& particle, std::chrono::minutes departureTime, const Stop* end)
 {
     if (particle.path.empty())
         return;
@@ -299,7 +289,6 @@ static void evaluateParticle(Particle& particle, std::chrono::minutes departureT
     particle.waitingTime = std::chrono::minutes(0);
 
     particle.transfers = 0;
-    particle.cost = 0.0;
 
     Trip* previousTrip = nullptr;
     auto arrival = departureTime;
@@ -318,14 +307,12 @@ static void evaluateParticle(Particle& particle, std::chrono::minutes departureT
                 particle.waitingTime += wait;
         }
 
-        particle.cost += calculateCost(edge);
-
         previousTrip = trip;
         arrival = edge.to->getTime();
     }
 }
 
-static void updateArchive(std::vector<Particle>& archive, const Particle& candidate)
+void PSOAlgorithm::updateArchive(std::vector<Particle>& archive, const Particle& candidate)
 {
     if (candidate.path.empty())
         return;
@@ -358,7 +345,7 @@ static void updateArchive(std::vector<Particle>& archive, const Particle& candid
     }
 }
 
-static const Particle& selectLeader(const std::vector<Particle>& archive, Objective objective)
+const Particle& PSOAlgorithm::selectLeader(const std::vector<Particle>& archive, Objective objective)
 {
     std::vector<const Particle*> candidates;
 
@@ -389,9 +376,6 @@ static const Particle& selectLeader(const std::vector<Particle>& archive, Object
 
             case TRANSFERS:
                 return a->transfers < b->transfers;
-
-            case COST:
-                return a->cost < b->cost;
             }
 
             return false;
@@ -402,7 +386,7 @@ static const Particle& selectLeader(const std::vector<Particle>& archive, Object
     return *candidates.front();
 }
 
-static void rerouteFromIndex(Particle& particle, const Particle& leader, const Network& network, const Stop* end, int splitIndex)
+void PSOAlgorithm::rerouteFromIndex(Particle& particle, const Particle& leader, const Network& network, const Stop* end, int splitIndex)
 {
     if (particle.path.empty())
         return;
@@ -425,7 +409,7 @@ static void rerouteFromIndex(Particle& particle, const Particle& leader, const N
         if (!current || current->getStop() == end)
             break;
 
-        auto departures = network.getStopTimes(current->getStop(), current->getTime(), current->getTrip(), MIN_TRANSFER_DURATION, MAX_DEPARTURES_PER_ROUTE);
+        auto departures = network.getStopTimes(current->getStop(), current->getTime(), current->getTrip(), MIN_TRANSFER_TIME, MAX_DEPARTURES_PER_ROUTE);
 
         if (departures.empty())
             break;
@@ -473,7 +457,7 @@ static void rerouteFromIndex(Particle& particle, const Particle& leader, const N
     }
 }
 
-static void followPath(Particle& particle, const Particle&leader, const std::vector<ConnectionTime>& target, const Network& network, const Stop* end)
+void PSOAlgorithm::followPath(Particle& particle, const Particle&leader, const std::vector<ConnectionTime>& target, const Network& network, const Stop* end)
 {
     if (particle.path.empty() || target.empty())
         return;
@@ -490,7 +474,7 @@ static void followPath(Particle& particle, const Particle&leader, const std::vec
          && particle.path[i].to->getTime() < targetStop->getTime())
         {
 			if (particle.path[i].to->getTrip()->getJobId() != targetStop->getTrip()->getJobId()
-			 && particle.path[i].to->getTime() + std::chrono::minutes(MIN_TRANSFER_DURATION) > targetStop->getTime())
+			 && particle.path[i].to->getTime() + std::chrono::minutes(MIN_TRANSFER_TIME) > targetStop->getTime())
 				continue;
 
 
@@ -571,7 +555,6 @@ std::vector<Path> PSOAlgorithm::findPath(const Network& network, const Stop* sta
             current.arrivalTime = particle.arrivalTime;
             current.travelTime = particle.travelTime;
             current.waitingTime = particle.waitingTime;
-            current.cost = particle.cost;
             current.transfers = particle.transfers;
 
             Particle best;
@@ -580,7 +563,6 @@ std::vector<Path> PSOAlgorithm::findPath(const Network& network, const Stop* sta
             best.arrivalTime = particle.arrivalTime;
             best.travelTime = particle.travelTime;
             best.waitingTime = particle.waitingTime;
-            best.cost = particle.cost;
             best.transfers = particle.transfers;
 
             if (particle.personalBest.empty() || dominates(current, best))
@@ -604,7 +586,6 @@ std::vector<Path> PSOAlgorithm::findPath(const Network& network, const Stop* sta
             particle.arrivalTime,
             particle.travelTime,
             particle.waitingTime,
-            particle.cost,
             particle.transfers));
     }
 

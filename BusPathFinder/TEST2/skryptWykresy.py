@@ -3,6 +3,18 @@ import matplotlib.pyplot as plt
 from scipy.stats import kruskal
 import scikit_posthocs as sp
 
+def safe_kruskal(gen, aco, pso):
+    all_values = pd.concat([gen, aco, pso])
+
+    if all_values.nunique() <= 1:
+        return None, None, "wszystkie wartości identyczne"
+
+    if len(gen) < 2 or len(aco) < 2 or len(pso) < 2:
+        return None, None, "za mało danych"
+
+    stat, p = kruskal(gen, aco, pso)
+    return stat, p, "ok"
+
 # =========================
 # WCZYTANIE DANYCH
 # =========================
@@ -139,7 +151,12 @@ gen = hv[hv["algorytm"] == "GEN"]["HV"]
 aco = hv[hv["algorytm"] == "ACO"]["HV"]
 pso = hv[hv["algorytm"] == "PSO"]["HV"]
 
-stat, p = kruskal(gen, aco, pso)
+stat, p, status = safe_kruskal(gen, aco, pso)
+
+if status != "ok":
+    print(f"Test pominięty: {status}")
+else:
+    print(f"H = {stat:.4f}, p = {p:.6f}")
 
 kruskal_global = pd.DataFrame({
     "Test": ["Kruskal-Wallis globalnie"],
@@ -169,23 +186,22 @@ for exp_id, group in hv.groupby("nr_eksperymentu"):
     aco = group[group["algorytm"] == "ACO"]["HV"]
     pso = group[group["algorytm"] == "PSO"]["HV"]
 
-    if len(gen) < 2 or len(aco) < 2 or len(pso) < 2:
+    stat, p, status = safe_kruskal(gen, aco, pso)
+
+    if status != "ok":
         kruskal_rows.append({
             "Eksperyment": exp_id,
             "H": None,
             "p": None,
-            "Wniosek": "za mało danych"
+            "Wniosek": status
         })
-        continue
-
-    stat, p = kruskal(gen, aco, pso)
-
-    kruskal_rows.append({
-        "Eksperyment": exp_id,
-        "H": stat,
-        "p": p,
-        "Wniosek": "istotne" if p < 0.05 else "brak istotności"
-    })
+    else:
+        kruskal_rows.append({
+            "Eksperyment": exp_id,
+            "H": stat,
+            "p": p,
+            "Wniosek": "istotne" if p < 0.05 else "brak istotności"
+        })
 
 kruskal_exp = pd.DataFrame(kruskal_rows)
 

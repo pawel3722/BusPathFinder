@@ -1,5 +1,5 @@
 nr_eksperymentu,algorytm,liczba_uruchomien,liczba_poprawnych,success_rate,success_rate_%
-0,ACO,10,10,1.0,100.0
+0,ACO,10,9,0.9,90.0
 0,GEN,10,10,1.0,100.0
 0,PSO,10,10,1.0,100.0
 1,ACO,10,10,1.0,100.0
@@ -11,3 +11,6 @@ nr_eksperymentu,algorytm,liczba_uruchomien,liczba_poprawnych,success_rate,succes
 3,ACO,10,10,1.0,100.0
 3,GEN,10,10,1.0,100.0
 3,PSO,10,10,1.0,100.0
+4,ACO,10,10,1.0,100.0
+4,GEN,10,10,1.0,100.0
+4,PSO,10,10,1.0,100.0

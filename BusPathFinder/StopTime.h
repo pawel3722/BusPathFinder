@@ -14,6 +14,17 @@ struct ConnectionTime
 	}
 };
 
+struct ConnectionTimeHash
+{
+	size_t operator()(const ConnectionTime& c) const
+	{
+		size_t h1 = std::hash<const void*>()(c.from);
+		size_t h2 = std::hash<const void*>()(c.to);
+
+		return h1 ^ (h2 << 1);
+	}
+};
+
 class StopTime
 {
 	const Stop* stop;

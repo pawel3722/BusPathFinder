@@ -17,7 +17,6 @@ std::ostream& operator<<(std::ostream& os, const Path& path)
 	os << "Arrival time: " << formatTime(path.arrivalTime) << std::endl;
 	os << "Travel time:  " << formatTime(path.travelTime) << std::endl;
 	os << "Waiting time: " << formatTime(path.waitingTime) << std::endl;
-	os << "Cost:         " << path.cost << std::endl;
 	os << "Transfers:    " << path.transfers << std::endl;
 	os << "- - - - - - - - - - - - - - - - - - "<< std::endl;
 	for (const auto& node : path.nodes)
@@ -31,12 +30,11 @@ std::ostream& operator<<(std::ostream& os, const Path& path)
 	return os;
 }
 
-Path::Path(std::vector<ConnectionTime> v, std::chrono::minutes a, std::chrono::minutes t, std::chrono::minutes w, double c, int tr)
+Path::Path(std::vector<ConnectionTime> v, std::chrono::minutes a, std::chrono::minutes t, std::chrono::minutes w, int tr)
 {
 	arrivalTime = a;
 	travelTime = t;
 	waitingTime = w;
-	cost = c;
 	transfers = tr;
 
 	Trip* currentTrip = nullptr;
@@ -64,7 +62,7 @@ Path::Path(std::vector<ConnectionTime> v, std::chrono::minutes a, std::chrono::m
 
 bool Path::operator==(const Path& other) const
 {
-	bool val = arrivalTime == other.arrivalTime && travelTime == other.travelTime && waitingTime == other.waitingTime && cost == other.cost && transfers == other.transfers;
+	bool val = arrivalTime == other.arrivalTime && travelTime == other.travelTime && waitingTime == other.waitingTime && transfers == other.transfers;
 
 	if (!val || nodes.size() != other.nodes.size())
 		return false;
