@@ -1,0 +1,8 @@
+GTFS_TYPE=2
+DATA_PATH=.\GZM
+CONFIG_GEN=configGen.txt
+CONFIG_ACO=configAco.txt
+CONFIG_PSO=configPso.txt
+INPUT_PATH=GZM\input.txt
+OUTPUT_PATH=TEST\output.txt
+OUTPUT_CSV_PATH=TEST\output.csv

@@ -15,21 +15,55 @@
 #include "PSOAlgorithm.h"
 #include "Result.h"
 
-int main()
+std::unordered_map<std::string, std::string> readConfigFile()
 {
-    #ifdef _WIN32
-        SetConsoleOutputCP(CP_UTF8);
-        SetConsoleCP(CP_UTF8);
-    #endif
+    std::cout << "Podaj sciezke do pliku konfiguracyjnego:" << std::endl;
+    std::string configFilePath;
+    std::cin >> configFilePath;
 
+    if (configFilePath == "")
+        configFilePath = "config.txt";
 
-   //auto network = NetworkLoaderZG::load(".\\ZielonaGora");
-   //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
-   auto network = NetworkLoaderGZM::load(".\\GZM");
+    std::ifstream file(configFilePath);
 
-    GeneticAlgorithm genAlg("configGen.txt");
-    ACOAlgorithm acoAlg("configAco.txt");
-    PSOAlgorithm psoAlg("configPso.txt");
+    if (!file)
+        throw std::runtime_error("Cannot open config file: " + configFilePath);
+
+    std::unordered_map<std::string, std::string> params;
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (line.empty() || line[0] == '#')
+            continue;
+
+        auto pos = line.find('=');
+        if (pos == std::string::npos)
+            continue;
+
+        std::string key = line.substr(0, pos);
+        std::string value = line.substr(pos + 1);
+
+        params[key] = value;
+    }
+
+    return params;
+}
+
+void test()
+{
+    auto config = readConfigFile();
+    int gtfsType = std::stoi(config.at("GTFS_TYPE"));
+
+    GeneticAlgorithm genAlg(config.at("CONFIG_GEN"));
+    ACOAlgorithm acoAlg(config.at("CONFIG_ACO"));
+    PSOAlgorithm psoAlg(config.at("CONFIG_PSO"));
+
+    Network network =
+        (gtfsType == 0) ? NetworkLoaderZG::load(config.at("DATA_PATH")) :
+        (gtfsType == 1) ? NetworkLoaderGdansk::load(config.at("DATA_PATH")) :
+        NetworkLoaderGZM::load(config.at("DATA_PATH"));
+
     RouteFinder genAlgRouteFinder(network, genAlg);
     RouteFinder acoAlgRouteFinder(network, acoAlg);
     RouteFinder psoAlgRouteFinder(network, psoAlg);
@@ -37,143 +71,138 @@ int main()
     int startId = 0;
     int endId = 0;
     std::string timeStr = "00:00";
-    while (true)
+
+    const Stop* start = nullptr;
+    const Stop* end = nullptr;
+    std::chrono::minutes departureTime;
+    std::cout << "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||QUERY||||||||||||||||||||" << std::endl;
+    std::cout << "Start stop ID: ";
+    std::cin >> startId;
+
+    if (startId == 0)
     {
+        start = network.getRandomStop();
+        end = network.getRandomStop();
+        departureTime = randomTime();
 
-        const Stop* start = nullptr;
-        const Stop* end = nullptr;
-        std::chrono::minutes departureTime;
-        std::cout << "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||QUERY||||||||||||||||||||" << std::endl;
-        std::cout << "Start stop ID: ";
-        std::cin >> startId;
+        std::cout << "FROM: " << start->getName() << " <" << start->getId() << "> TO: " << end->getName() << " <" << end->getId() << "> AT: " << formatTime(departureTime) << std::endl;
+    }
+    else
+    {
+        std::cout << "End stop ID: ";
+        std::cin >> endId;
 
-        if (startId == 0)
+        std::cout << "Departure time (HH:MM): ";
+        std::cin >> timeStr;
+
+        start = network.getStop(startId);
+        end = network.getStop(endId);
+
+        if (!start)
         {
-            start = network.getRandomStop();
-            end = network.getRandomStop();
-            departureTime = randomTime();
-
-            std::cout << "FROM: " << start->getName() << " <" << start->getId() << "> TO: " << end->getName() << " <" << end->getId() << "> AT: " << formatTime(departureTime) << std::endl;
-        }
-        else
-        {
-            std::cout << "End stop ID: ";
-            std::cin >> endId;
-
-            std::cout << "Departure time (HH:MM): ";
-            std::cin >> timeStr;
-
-            start = network.getStop(startId);
-            end = network.getStop(endId);
-
-            if (!start)
-            {
-                std::cout << "Invalid start stop ID\n";
-                startId = 0;
-                continue;
-            }
-
-            if (!end)
-            {
-                std::cout << "Invalid end stop ID\n";
-                startId = 0;
-                continue;
-            }
-
-
-            try {
-                departureTime = parseTime(timeStr);
-            }
-            catch (std::exception ex)
-            {
-                departureTime = parseTime("00:00");
-            }
+            std::cout << "Invalid start stop ID\n";
+            startId = 0;
+            return;
         }
 
-        std::vector<Path> pathsGen;
-        std::vector<Path> pathsAco;
-        std::vector<Path> pathsPso;
-
-        auto futureGen = std::async(std::launch::async, [&]()
-            {
-                auto res = genAlgRouteFinder.findRoute(
-                    start,
-                    end,
-                    departureTime);
-                std::cout << "GEN ready! " << std::endl;
-                return res;
-            });
-
-        auto futureAco = std::async(std::launch::async, [&]()
-            {
-                auto res = acoAlgRouteFinder.findRoute(
-                    start,
-                    end,
-                    departureTime);
-                std::cout << "ACO ready! " << std::endl;
-                return res;
-            });
-        auto futurePso = std::async(std::launch::async, [&]()
-            {
-                auto res = psoAlgRouteFinder.findRoute(
-                    start,
-                    end,
-                    departureTime);
-                std::cout << "PSO ready! " << std::endl;
-                return res;
-            });
-
-        // bariera — czekamy na oba wyniki
-        try
+        if (!end)
         {
-            pathsGen = futureGen.get();
-        }
-        catch (const std::exception& ex)
-        {
-            std::cout << "GEN exception: " << ex.what() << std::endl;
+            std::cout << "Invalid end stop ID\n";
+            startId = 0;
+            return;
         }
 
-        try
-        {
-            pathsAco = futureAco.get();
+
+        try {
+            departureTime = parseTime(timeStr);
         }
-        catch (const std::exception& ex)
+        catch (std::exception ex)
         {
-            std::cout << "ACO exception: " << ex.what() << std::endl;
-        }
-
-        try
-        {
-            pathsPso = futurePso.get();
-        }
-        catch (const std::exception& ex)
-        {
-            std::cout << "PSO exception: " << ex.what() << std::endl;
-        }
-
-        std::cout << "++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++" << std::endl;
-
-        for (const auto& path : pathsGen)
-        {
-            std::cout << path << std::endl;
-        }
-
-        std::cout << "++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++" << std::endl;
-
-        for (const auto& path : pathsAco)
-        {
-            std::cout << path << std::endl;
-        }
-
-        std::cout << "++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++" << std::endl;
-
-        for (const auto& path : pathsPso)
-        {
-            std::cout << path << std::endl;
+            departureTime = parseTime("00:00");
         }
     }
 
-    return 0;
+    std::vector<Path> pathsGen;
+    std::vector<Path> pathsAco;
+    std::vector<Path> pathsPso;
+
+    auto futureGen = std::async(std::launch::async, [&]()
+        {
+            auto res = genAlgRouteFinder.findRoute(
+                start,
+                end,
+                departureTime);
+            std::cout << "GEN ready! " << std::endl;
+            return res;
+        });
+
+    auto futureAco = std::async(std::launch::async, [&]()
+        {
+            auto res = acoAlgRouteFinder.findRoute(
+                start,
+                end,
+                departureTime);
+            std::cout << "ACO ready! " << std::endl;
+            return res;
+        });
+    auto futurePso = std::async(std::launch::async, [&]()
+        {
+            auto res = psoAlgRouteFinder.findRoute(
+                start,
+                end,
+                departureTime);
+            std::cout << "PSO ready! " << std::endl;
+            return res;
+        });
+
+    // bariera — czekamy na oba wyniki
+    try
+    {
+        pathsGen = futureGen.get();
+    }
+    catch (const std::exception& ex)
+    {
+        std::cout << "GEN exception: " << ex.what() << std::endl;
+    }
+
+    try
+    {
+        pathsAco = futureAco.get();
+    }
+    catch (const std::exception& ex)
+    {
+        std::cout << "ACO exception: " << ex.what() << std::endl;
+    }
+
+    try
+    {
+        pathsPso = futurePso.get();
+    }
+    catch (const std::exception& ex)
+    {
+        std::cout << "PSO exception: " << ex.what() << std::endl;
+    }
+
+    std::cout << "++++++++++++++++++++++++++++++++++++GEN++++++++++++++++++++++++++++++++++++" << std::endl;
+
+    for (const auto& path : pathsGen)
+    {
+        std::cout << path << std::endl;
+    }
+
+    std::cout << "++++++++++++++++++++++++++++++++++++ACO++++++++++++++++++++++++++++++++++++" << std::endl;
+
+    for (const auto& path : pathsAco)
+    {
+        std::cout << path << std::endl;
+    }
+
+    std::cout << "++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++" << std::endl;
+
+    for (const auto& path : pathsPso)
+    {
+        std::cout << path << std::endl;
+    }
 }
 
 void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header)
@@ -353,43 +382,44 @@ void printOutput(std::ofstream& os, std::vector<Result>& vec, std::string header
 }
 
 
-int main1(int argc, char* argv[])
+void benchmark()
 {
-#ifdef _WIN32
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-#endif
+    auto config = readConfigFile();
+    int gtfsType = std::stoi(config.at("GTFS_TYPE"));
 
-	std::string outputPath = R"(GZM\output.txt)";
-	std::string outputCsvPath = R"(GZM\output.csv)";
-	std::string inputPath = R"(GZM\input.txt)";
+    Network network =
+        (gtfsType == 0) ? NetworkLoaderZG::load(config.at("DATA_PATH")) :
+        (gtfsType == 1) ? NetworkLoaderGdansk::load(config.at("DATA_PATH")) :
+        NetworkLoaderGZM::load(config.at("DATA_PATH"));
+
+    GeneticAlgorithm genAlg(config.at("CONFIG_GEN"));
+    ACOAlgorithm acoAlg(config.at("CONFIG_ACO"));
+    PSOAlgorithm psoAlg(config.at("CONFIG_PSO"));
+
+
+    std::string outputPath = config.at("OUTPUT_PATH");
+    std::string outputCsvPath = config.at("OUTPUT_CSV_PATH");
+	std::string inputPath = config.at("INPUT_PATH");
 
 	std::ifstream inputFile(inputPath);
     if (!inputFile.is_open())
     {
         std::cout << "Could not open input file." << std::endl;
-        return 0;
+        return;
     }
 	std::ofstream outputFile(outputPath);
 	if (!outputFile.is_open())
 	{
 		std::cout << "Could not open output file." << std::endl;
-		return 0;
+		return;
 	}
     std::ofstream outputCsvFile(outputCsvPath);
     if (!outputCsvFile.is_open())
     {
         std::cout << "Could not open output csv file." << std::endl;
-        return 0;
+        return;
     }
 
-    //auto network = NetworkLoaderZG::load(".\\ZielonaGora");
-    auto network = NetworkLoaderGZM::load(".\\GZM");
-    //auto network = NetworkLoaderGdansk::load(".\\Gdansk", "20260602");
-
-    GeneticAlgorithm genAlg;
-    ACOAlgorithm acoAlg;
-    PSOAlgorithm psoAlg;
     RouteFinder genAlgRouteFinder(network, genAlg);
     RouteFinder acoAlgRouteFinder(network, acoAlg);
     RouteFinder psoAlgRouteFinder(network, psoAlg);
@@ -496,5 +526,31 @@ int main1(int argc, char* argv[])
         printOutput(outputFile, psoResults, "++++++++++++++++++++++++++++++++++++PSO++++++++++++++++++++++++++++++++++++");
 
         experiment++;
+    }
+}
+
+int main()
+{
+    while (true)
+    {
+#ifdef _WIN32
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+#endif
+
+        std::cout << "Wybierz opcje dzialania programu:" << std::endl
+            << "Test - 1" << std::endl
+            << "Badania - 2" << std::endl
+            << "Wyjście - 0" << std::endl;
+        std::string input;
+        std::cin >> input;
+        if (input == "1")
+            test();
+        else if (input == "2")
+            benchmark();
+        else if (input == "0")
+            break;
+        else
+            std::cout << "Niepoprawny numer!" << std::endl;
     }
 }

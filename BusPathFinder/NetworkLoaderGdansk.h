@@ -8,8 +8,5 @@
 class NetworkLoaderGdansk
 {
 public:
-    static Network load(
-        const std::string& gtfsDirectory,
-        const std::string& targetDate
-    );
+    static Network load(const std::string& gtfsDirectory);
 };

@@ -161,10 +161,7 @@ static std::string baseStopName(const std::string& name)
 // Loader
 // =========================
 
-Network NetworkLoaderGdansk::load(
-    const std::string& gtfsDirectory,
-    const std::string& targetDate
-)
+Network NetworkLoaderGdansk::load(const std::string& gtfsDirectory)
 {
     std::unordered_map<int, std::unique_ptr<Stop>> stops;
     std::unordered_set<std::unique_ptr<StopTime>> stopTimes;
@@ -345,9 +342,6 @@ Network NetworkLoaderGdansk::load(
             auto row = parseCsvLine(line);
 
             std::string serviceId = getRequired(row, header, "service_id");
-
-            if (!endsWith(serviceId, targetDate))
-                continue;
 
             std::string id = getRequired(row, header, "trip_id");
             std::string routeIdRaw = getRequired(row, header, "route_id");
